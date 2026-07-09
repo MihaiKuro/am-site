@@ -231,17 +231,17 @@ export const getSalesReport = async (req, res) => {
 				status: { $in: ["Delivered", "Shipped"] }
 			}
 		});
-		// 2. După $unwind: "$product", adaugă $match pe categorie/subcategorie dacă e cazul
+		// 2. După $unwind: "$product", filtrează produsele în stoc și aplică filtru pe categorie/subcategorie dacă e cazul
 		const unwindProductIndex = pipeline.findIndex(
 			stage => stage.$unwind && stage.$unwind === "$product"
 		);
 		if (unwindProductIndex !== -1) {
-			const matchObj = {};
+			const matchObj = {
+				"product.stock": { $gt: 0 }
+			};
 			if (categoryId) matchObj["product.category"] = new mongoose.Types.ObjectId(categoryId);
 			if (subcategoryId) matchObj["product.subcategory"] = new mongoose.Types.ObjectId(subcategoryId);
-			if (Object.keys(matchObj).length > 0) {
-				pipeline.splice(unwindProductIndex + 1, 0, { $match: matchObj });
-			}
+			pipeline.splice(unwindProductIndex + 1, 0, { $match: matchObj });
 		}
 
 		const salesReport = await Order.aggregate(pipeline);
@@ -264,6 +264,11 @@ export const getSalesReport = async (req, res) => {
 			},
 			{
 				$unwind: "$product"
+			},
+			{
+				$match: {
+					"product.stock": { $gt: 0 }
+				}
 			},
 			{
 				$group: {
