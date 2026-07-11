@@ -1,7 +1,9 @@
 import { redis } from "../lib/redis.js";
 import cloudinary from "../lib/cloudinary.js";
+import mongoose from "mongoose";
 import Product from "../models/product.model.js";
 import Category from "../models/category.model.js";
+import { getProductReviewStats, attachReviewStatsToProducts } from "./review.controller.js";
 
 const populateProductFields = async (product) => {
 	if (!product) return null;
@@ -65,7 +67,7 @@ export const getFeaturedProducts = async (req, res) => {
 		if (featuredProducts) {
 			const cached = JSON.parse(featuredProducts).filter((p) => p && p.stock > 0);
 			if (cached.length > 0) {
-				return res.json(cached);
+				return res.json(await attachReviewStatsToProducts(cached));
 			}
 		}
 
@@ -77,7 +79,7 @@ export const getFeaturedProducts = async (req, res) => {
 
 		await redis.set("featured_products", JSON.stringify(inStockFeatured));
 
-		res.json(inStockFeatured);
+		res.json(await attachReviewStatsToProducts(inStockFeatured));
 	} catch (error) {
 		console.log("Error in getFeaturedProducts controller", error.message);
 		res.status(500).json({ message: "Server error", error: error.message });
@@ -158,7 +160,15 @@ export const deleteProduct = async (req, res) => {
 
 export const getRecommendedProducts = async (req, res) => {
 	try {
+		const { exclude } = req.query;
+		const matchStage = { stock: { $gt: 0 } };
+
+		if (exclude && mongoose.Types.ObjectId.isValid(exclude)) {
+			matchStage._id = { $ne: new mongoose.Types.ObjectId(exclude) };
+		}
+
 		const products = await Product.aggregate([
+			{ $match: matchStage },
 			{
 				$sample: { size: 4 },
 			},
@@ -200,9 +210,30 @@ export const getRecommendedProducts = async (req, res) => {
 			})
 		);
 
-		res.json(finalProducts);
+		const productsWithReviews = await attachReviewStatsToProducts(finalProducts);
+		res.json(productsWithReviews);
 	} catch (error) {
 		console.log("Error in getRecommendedProducts controller", error.message);
+		res.status(500).json({ message: "Server error", error: error.message });
+	}
+};
+
+export const getProductById = async (req, res) => {
+	try {
+		const product = await populateProductFields({ _id: req.params.id });
+		if (!product) {
+			return res.status(404).json({ message: "Product not found" });
+		}
+
+		const { averageRating, reviewCount } = await getProductReviewStats(req.params.id);
+
+		res.json({
+			...product,
+			rating: averageRating,
+			reviewCount,
+		});
+	} catch (error) {
+		console.log("Error in getProductById controller", error.message);
 		res.status(500).json({ message: "Server error", error: error.message });
 	}
 };
@@ -214,7 +245,10 @@ export const getProductsByCategory = async (req, res) => {
 		const populatedProducts = await Promise.all(
 			products.map(product => populateProductFields(product))
 		);
-		res.json({ products: populatedProducts.filter(Boolean) });
+		const productsWithReviews = await attachReviewStatsToProducts(
+			populatedProducts.filter(Boolean)
+		);
+		res.json({ products: productsWithReviews });
 	} catch (error) {
 		console.log("Error in getProductsByCategory controller", error.message);
 		res.status(500).json({ message: "Server error", error: error.message });
@@ -239,8 +273,12 @@ export const getProductsBySubcategory = async (req, res) => {
 				return product;
 			})
 		);
-		
-		res.json({ products: populatedProducts.filter(Boolean) });
+
+		const productsWithReviews = await attachReviewStatsToProducts(
+			populatedProducts.filter(Boolean)
+		);
+
+		res.json({ products: productsWithReviews });
 	} catch (error) {
 		console.log("Error in getProductsBySubcategory controller", error.message);
 		res.status(500).json({ message: "Server error", error: error.message });
@@ -278,7 +316,7 @@ export async function updateFeaturedProductsCache() {
 
 export const updateProduct = async (req, res) => {
 	try {
-		const { name, description, price, image, category, subcategory, stock } = req.body;
+		const { name, description, price, image, category, subcategory, stock, basePrice } = req.body;
 		const productId = req.params.id;
 
 		const product = await Product.findById(productId);
@@ -330,6 +368,7 @@ export const updateProduct = async (req, res) => {
 				category: category || product.category,
 				subcategory: subcategory || product.subcategory,
 				stock: stock !== undefined ? parseInt(stock) : product.stock,
+				basePrice: basePrice !== undefined && basePrice !== "" ? parseFloat(basePrice) : product.basePrice,
 			},
 			{ new: true }
 		);

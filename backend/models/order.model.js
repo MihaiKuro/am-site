@@ -46,6 +46,11 @@ const orderSchema = new mongoose.Schema(
 			type: String,
 			required: true,
 		},
+		deliveryMethod: {
+			type: String,
+			enum: ["courier", "pickup"],
+			default: "courier",
+		},
 		paymentResult: {
 			id: { type: String },
 			status: { type: String },

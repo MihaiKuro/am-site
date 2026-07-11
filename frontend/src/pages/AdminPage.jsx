@@ -61,7 +61,7 @@ const AdminPage = () => {
 				</motion.h1>
 
 				{/* Mobile: dropdown */}
-				<div className='lg:hidden mb-6'>
+				<div className='md:hidden mb-6'>
 					<label htmlFor='admin-tab-select' className='sr-only'>Secțiune admin</label>
 					<select
 						id='admin-tab-select'
@@ -73,6 +73,24 @@ const AdminPage = () => {
 							<option key={tab.id} value={tab.id}>{tab.label}</option>
 						))}
 					</select>
+				</div>
+
+				{/* Tablet & small desktop: scrollable tab row */}
+				<div className='hidden md:flex lg:hidden overflow-x-auto pb-2 mb-6 -mx-1 px-1 gap-2 scrollbar-thin'>
+					{tabs.map((tab) => (
+						<button
+							key={tab.id}
+							onClick={() => setActiveTab(tab.id)}
+							className={`flex items-center shrink-0 px-4 py-2.5 rounded-lg transition-all duration-200 text-sm whitespace-nowrap ${
+								activeTab === tab.id
+									? "bg-[#2B4EE6] text-white shadow-lg shadow-blue-500/20"
+									: "bg-gray-800/50 text-gray-300 hover:bg-gray-700/50 border border-gray-700"
+							}`}
+						>
+							<tab.icon className='mr-2 h-4 w-4 shrink-0' />
+							{tab.label}
+						</button>
+					))}
 				</div>
 
 				{/* Desktop: tab buttons */}

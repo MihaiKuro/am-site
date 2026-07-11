@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 const CategoryItem = ({ category }) => {
 	return (
 		<motion.div
-			className='relative overflow-hidden h-80 w-full rounded-lg group bg-gray-800/50 backdrop-blur-sm border border-gray-700'
+			className='relative overflow-hidden h-56 sm:h-72 md:h-80 w-full rounded-lg group bg-gray-800/50 backdrop-blur-sm border border-gray-700'
 			whileHover={{ scale: 1.02 }}
 			transition={{ duration: 0.2 }}
 		>

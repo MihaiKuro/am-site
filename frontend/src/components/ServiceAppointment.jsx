@@ -12,7 +12,7 @@ const TIME_SLOTS = [
   "09:00", "10:00", "11:00", "13:00", "14:00", "15:00", "16:00"
 ];
 
-export default function ServiceAppointment() {
+export default function ServiceAppointment({ onSuccess, compact = false }) {
   const [serviceType, setServiceType] = useState(SERVICE_TYPES[0].value);
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
@@ -116,6 +116,7 @@ export default function ServiceAppointment() {
       setVehicle("");
       setNote("");
       setTime("");
+      onSuccess?.();
     } catch (e) {
       setError(e.response?.data?.message || "Eroare la programare");
       setSubmitting(false);
@@ -123,7 +124,7 @@ export default function ServiceAppointment() {
   };
 
   return (
-    <div className="max-w-5xl mx-auto mt-10 sm:mt-16 mb-10 sm:mb-16 px-4 sm:px-6">
+    <div className={`max-w-5xl mx-auto ${compact ? "mt-0 mb-0" : "mt-10 sm:mt-16 mb-10 sm:mb-16"} px-4 sm:px-6`}>
       <h2 className="text-2xl sm:text-3xl font-bold text-white text-center mb-2 px-2">Programează o programare la service</h2>
       <p className="text-sm sm:text-base text-gray-400 text-center mb-6 sm:mb-8 px-2">Servicii profesionale de instalare și întreținere oferite de mecanici autorizați</p>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-10">

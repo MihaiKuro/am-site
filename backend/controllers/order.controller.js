@@ -5,7 +5,7 @@ import { updateFeaturedProductsCache } from "./product.controller.js";
 
 export const createOrder = async (req, res) => {
     try {
-        const { orderItems, shippingAddress, paymentMethod, totalPrice } = req.body;
+        const { orderItems, shippingAddress, paymentMethod, deliveryMethod, totalPrice } = req.body;
 
         console.log('Creating order with data:', { orderItems, shippingAddress, paymentMethod, totalPrice, userId: req.user?._id });
 
@@ -41,6 +41,7 @@ export const createOrder = async (req, res) => {
             orderItems: orderItemsWithPrice,
             shippingAddress,
             paymentMethod,
+            deliveryMethod: deliveryMethod || "courier",
             totalPrice,
         });
 

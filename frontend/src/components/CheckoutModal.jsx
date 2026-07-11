@@ -75,13 +75,11 @@ const CheckoutModal = ({ isOpen, onClose }) => {
                 setSelectedAddressId(addressToUse._id);
             }
         } else {
-            // Clear address and phone fields if user unchecks and they were pre-filled from profile
             setBillingDetails(prev => ({
                 ...prev,
                 address: '',
                 city: '',
                 postalCode: '',
-                phone: '', // Clear phone if not using profile
             }));
             setSelectedAddressId(null);
         }
@@ -147,7 +145,8 @@ const CheckoutModal = ({ isOpen, onClose }) => {
             // Create checkout session
             const response = await axios.post('/payments/create-checkout-session', {
                 products,
-                couponCode: isCouponApplied ? coupon?.code : null
+                couponCode: isCouponApplied ? coupon?.code : null,
+                deliveryMethod,
             });
 
             if (response.data.id) {
@@ -193,19 +192,26 @@ const CheckoutModal = ({ isOpen, onClose }) => {
             }));
 
             // Prepare shipping address
-            const shippingAddress = {
-                street: billingDetails.address,
-                city: billingDetails.city,
-                postalCode: billingDetails.postalCode,
-                country: 'Romania'
-            };
+            const shippingAddress = deliveryMethod === 'pickup'
+                ? {
+                    street: 'Ridicare din magazin',
+                    city: 'Magazin',
+                    postalCode: '—',
+                    country: 'Romania',
+                }
+                : {
+                    street: billingDetails.address,
+                    city: billingDetails.city,
+                    postalCode: billingDetails.postalCode,
+                    country: 'Romania',
+                };
 
-            // Create order for cash on delivery
             const orderData = {
                 orderItems,
                 shippingAddress,
                 paymentMethod: 'cash',
-                totalPrice: total
+                deliveryMethod,
+                totalPrice: total,
             };
 
             const response = await axios.post('/orders', orderData);
@@ -213,7 +219,11 @@ const CheckoutModal = ({ isOpen, onClose }) => {
             if (response.data) {
                 // Clear cart after successful order placement
                 await clearCart();
-                toast.success('Comanda a fost plasată cu succes! Vei plăti la livrare. Coșul tău a fost golit.');
+                toast.success(
+                    deliveryMethod === 'pickup'
+                        ? 'Comanda a fost plasată cu succes! Vei plăti la ridicare. Coșul tău a fost golit.'
+                        : 'Comanda a fost plasată cu succes! Vei plăti la livrare. Coșul tău a fost golit.'
+                );
                 onClose();
             }
         } catch (error) {
@@ -226,17 +236,23 @@ const CheckoutModal = ({ isOpen, onClose }) => {
 
     if (!isOpen) return null;
 
+    const isPickup = deliveryMethod === 'pickup';
+    const cashPaymentTitle = isPickup ? 'Plată la ridicare' : 'Plată la livrare';
+    const cashPaymentDescription = isPickup
+        ? 'Plătești când ridici comanda din magazin'
+        : 'Plătești când primești coletul';
+
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 safe-area-bottom">
             <motion.div
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                className="bg-gray-800 rounded-lg w-full max-w-4xl max-h-[90vh] overflow-y-auto"
+                initial={{ opacity: 0, y: 24 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 24 }}
+                className="bg-gray-800 rounded-t-2xl sm:rounded-lg w-full max-w-4xl max-h-[95dvh] sm:max-h-[90vh] overflow-y-auto"
             >
-                <div className="p-6">
-                    <div className="flex justify-between items-center mb-6">
-                        <h2 className="text-2xl font-bold text-[#2B4EE6]">Finalizare comandă</h2>
+                <div className="p-4 sm:p-6">
+                    <div className="flex justify-between items-center mb-4 sm:mb-6 gap-4">
+                        <h2 className="text-xl sm:text-2xl font-bold text-[#2B4EE6]">Finalizare comandă</h2>
                         <button
                             onClick={onClose}
                             className="text-gray-400 hover:text-white"
@@ -246,24 +262,29 @@ const CheckoutModal = ({ isOpen, onClose }) => {
                     </div>
 
                     {/* Progress Steps */}
-                    <div className="flex justify-between mb-8">
-                        {["Livrare", "Date facturare", "Plată"].map((label, index) => (
+                    <div className="flex justify-between gap-1 sm:gap-2 mb-6 sm:mb-8">
+                        {[isPickup ? "Ridicare" : "Livrare", "Date facturare", "Plată"].map((label, index) => (
                             <div
                                 key={label}
-                                className={`flex items-center ${
+                                className={`flex flex-col sm:flex-row items-center flex-1 min-w-0 ${
                                     index + 1 === step ? 'text-[#2B4EE6]' : 'text-gray-400'
                                 }`}
                             >
                                 <div
-                                    className={`w-8 h-8 rounded-full flex items-center justify-center border-2 ${
+                                    className={`w-7 h-7 sm:w-8 sm:h-8 shrink-0 rounded-full flex items-center justify-center border-2 text-sm ${
                                         index + 1 === step
                                             ? 'border-[#2B4EE6] bg-[#2B4EE6] text-white'
+                                            : index + 1 < step
+                                            ? 'border-[#2B4EE6] text-[#2B4EE6]'
                                             : 'border-gray-400'
                                     }`}
                                 >
                                     {index + 1}
                                 </div>
-                                <span className="ml-2">{label}</span>
+                                <span className="mt-1 sm:mt-0 sm:ml-2 text-[10px] sm:text-sm text-center leading-tight">
+                                    <span className="sm:hidden">{index + 1 === 1 ? (isPickup ? 'Ridic.' : 'Livr.') : index + 1 === 2 ? 'Date' : 'Plată'}</span>
+                                    <span className="hidden sm:inline">{label}</span>
+                                </span>
                             </div>
                         ))}
                     </div>
@@ -271,7 +292,9 @@ const CheckoutModal = ({ isOpen, onClose }) => {
                     {/* Step 1: Delivery Method */}
                     {step === 1 && (
                         <div className="space-y-6">
-                            <h3 className="text-xl font-semibold text-white mb-4">Alege metoda de livrare</h3>
+                            <h3 className="text-xl font-semibold text-white mb-4">
+                                {isPickup ? 'Alege metoda de ridicare' : 'Alege metoda de livrare'}
+                            </h3>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <button
                                     onClick={() => setDeliveryMethod('courier')}
@@ -345,8 +368,7 @@ const CheckoutModal = ({ isOpen, onClose }) => {
                                         name="firstName"
                                         value={billingDetails.firstName}
                                         onChange={handleInputChange}
-                                        readOnly={useProfileAddress}
-                                        className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                                        className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white"
                                     />
                                 </div>
                                 <div>
@@ -356,8 +378,7 @@ const CheckoutModal = ({ isOpen, onClose }) => {
                                         name="lastName"
                                         value={billingDetails.lastName}
                                         onChange={handleInputChange}
-                                        readOnly={useProfileAddress}
-                                        className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                                        className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white"
                                     />
                                 </div>
                                 <div>
@@ -367,8 +388,7 @@ const CheckoutModal = ({ isOpen, onClose }) => {
                                         name="email"
                                         value={billingDetails.email}
                                         onChange={handleInputChange}
-                                        readOnly={useProfileAddress}
-                                        className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                                        className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white"
                                     />
                                 </div>
                                 <div>
@@ -378,8 +398,7 @@ const CheckoutModal = ({ isOpen, onClose }) => {
                                         name="phone"
                                         value={billingDetails.phone}
                                         onChange={handleInputChange}
-                                        readOnly={useProfileAddress}
-                                        className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                                        className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white"
                                     />
                                 </div>
                                 {deliveryMethod === 'courier' && (
@@ -392,7 +411,7 @@ const CheckoutModal = ({ isOpen, onClose }) => {
                                                 value={billingDetails.address}
                                                 onChange={handleInputChange}
                                                 readOnly={useProfileAddress}
-                                                className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                                                className={`w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white ${useProfileAddress ? 'opacity-75 cursor-not-allowed' : ''}`}
                                             />
                                         </div>
                                         <div>
@@ -403,7 +422,7 @@ const CheckoutModal = ({ isOpen, onClose }) => {
                                                 value={billingDetails.city}
                                                 onChange={handleInputChange}
                                                 readOnly={useProfileAddress}
-                                                className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                                                className={`w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white ${useProfileAddress ? 'opacity-75 cursor-not-allowed' : ''}`}
                                             />
                                         </div>
                                         <div>
@@ -414,7 +433,7 @@ const CheckoutModal = ({ isOpen, onClose }) => {
                                                 value={billingDetails.postalCode}
                                                 onChange={handleInputChange}
                                                 readOnly={useProfileAddress}
-                                                className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                                                className={`w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white ${useProfileAddress ? 'opacity-75 cursor-not-allowed' : ''}`}
                                             />
                                         </div>
                                     </>
@@ -482,8 +501,8 @@ const CheckoutModal = ({ isOpen, onClose }) => {
                                 >
                                     <Wallet className="w-6 h-6 text-[#2B4EE6]" />
                                     <div className="text-left">
-                                        <h4 className="font-medium text-white">Plată la livrare</h4>
-                                        <p className="text-sm text-gray-400">Plătești când primești coletul</p>
+                                        <h4 className="font-medium text-white">{cashPaymentTitle}</h4>
+                                        <p className="text-sm text-gray-400">{cashPaymentDescription}</p>
                                     </div>
                                 </button>
                             </div>
@@ -491,20 +510,22 @@ const CheckoutModal = ({ isOpen, onClose }) => {
                     )}
 
                     {/* Navigation Buttons */}
-                    <div className="flex justify-between mt-8">
-                        {step > 1 && (
+                    <div className="flex flex-col-reverse sm:flex-row sm:justify-between gap-3 mt-6 sm:mt-8">
+                        {step > 1 ? (
                             <button
                                 onClick={() => setStep(step - 1)}
-                                className="px-6 py-2 border border-gray-600 rounded-lg text-white hover:bg-gray-700"
+                                className="w-full sm:w-auto px-6 py-2.5 border border-gray-600 rounded-lg text-white hover:bg-gray-700"
                                 disabled={isProcessing}
                             >
                                 Înapoi
                             </button>
+                        ) : (
+                            <div className="hidden sm:block" />
                         )}
                         {step < 3 ? (
                             <button
                                 onClick={() => setStep(step + 1)}
-                                className="px-6 py-2 bg-[#2B4EE6] rounded-lg text-white hover:bg-blue-600 disabled:opacity-50"
+                                className="w-full sm:w-auto sm:ml-auto px-6 py-2.5 bg-[#2B4EE6] rounded-lg text-white hover:bg-blue-600 disabled:opacity-50"
                                 disabled={isProcessing}
                             >
                                 Continuă
@@ -512,7 +533,7 @@ const CheckoutModal = ({ isOpen, onClose }) => {
                         ) : (
                             <button
                                 onClick={handleSubmit}
-                                className="px-6 py-2 bg-[#2B4EE6] rounded-lg text-white hover:bg-blue-600 disabled:opacity-50"
+                                className="w-full sm:w-auto sm:ml-auto px-6 py-2.5 bg-[#2B4EE6] rounded-lg text-white hover:bg-blue-600 disabled:opacity-50"
                                 disabled={isProcessing}
                             >
                                 {isProcessing ? 'Se procesează...' : paymentMethod === 'card' ? 'Plătește cu cardul' : 'Plasează comanda'}

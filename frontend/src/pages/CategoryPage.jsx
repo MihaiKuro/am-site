@@ -59,11 +59,11 @@ const CategoryPage = () => {
 								to={`/category/${categorySlug}/${subcategory.slug}`}
 								className='group relative overflow-hidden rounded-lg bg-gray-800 hover:bg-gray-700 transition-all duration-300'
 							>
-								<div className='aspect-w-16 aspect-h-9'>
+								<div className='aspect-video relative overflow-hidden'>
 									<img
 										src={subcategory.image || currentCategory.image}
 										alt={subcategory.name}
-										className='w-full h-full object-cover transition-transform duration-300 group-hover:scale-105'
+										className='absolute inset-0 w-full h-full object-cover transition-transform duration-300 group-hover:scale-105'
 									/>
 								</div>
 								<div className='absolute inset-0 bg-gradient-to-t from-black/80 to-transparent'></div>

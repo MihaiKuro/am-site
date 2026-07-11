@@ -17,7 +17,7 @@ const LoginPage = () => {
 	};
 
 	return (
-		<div className='min-h-screen flex items-center justify-center bg-gray-900 py-12 px-4 sm:px-6 lg:px-8'>
+		<div className='flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8'>
 			<div className='max-w-md w-full'>
 				<motion.div
 					className='bg-gray-800 rounded-lg shadow-xl p-8'
@@ -66,7 +66,7 @@ const LoginPage = () => {
 							/>
 						</div>
 
-						<div className='flex items-center justify-between'>
+						<div className='flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3'>
 							<div className='flex items-center'>
 								<input
 									id='remember-me'

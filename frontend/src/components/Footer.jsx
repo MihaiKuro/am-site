@@ -110,11 +110,11 @@ const Footer = () => {
 
         {/* Footer Bottom */}
         <div className="mt-12 pt-8 border-t border-[#1A1F2B]">
-          <div className="flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
-            <p className="text-sm text-gray-500">
+            <div className="flex flex-col md:flex-row justify-between items-center gap-4 md:space-y-0">
+            <p className="text-sm text-gray-500 text-center md:text-left">
               © 2025 AutoPiese. Toate drepturile rezervate.
             </p>
-            <div className="flex space-x-6 text-sm">
+            <div className="flex flex-wrap justify-center gap-x-6 gap-y-2 text-sm">
               <Link to="/privacy" className="text-gray-500 hover:text-gray-300 transition-colors">
                 Politica de confidențialitate
               </Link>

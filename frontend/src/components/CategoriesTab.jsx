@@ -55,12 +55,14 @@ const CategoriesTab = () => {
 		try {
 			if (isSubcategory) {
 				if (editingSubcategory) {
-					// Update existing subcategory
 					const response = await axios.put(`/categories/${editingSubcategory.parentCategory}/subcategories/${editingSubcategory._id}`, {
 						name: editingSubcategory.name,
 						image: editingSubcategory.image !== editingSubcategory.imageUrl ? editingSubcategory.image : undefined,
 					});
-					updateSubcategory(editingSubcategory.parentCategory, response.data);
+					const updatedSubcategory = response.data.subcategories.find(
+						(sub) => sub._id === editingSubcategory._id
+					);
+					updateSubcategory(editingSubcategory.parentCategory, updatedSubcategory);
 					setEditingSubcategory(null);
 					toast.success("Subcategorie actualizată cu succes!");
 				} else {
@@ -76,28 +78,30 @@ const CategoriesTab = () => {
 				}
 			} else {
 				if (editingCategory) {
-					// Update existing category
-					const response = await axios.put(`/categories/${editingCategory._id}`, {
-						name: editingCategory.name,
-						image: editingCategory.image !== editingCategory.imageUrl ? editingCategory.image : undefined,
-					});
-					updateCategory(response.data);
-					setEditingCategory(null);
-					toast.success("Categorie actualizată cu succes!");
-				} else {
-					// Create new category
 					try {
-						const response = await axios.post("/categories", newCategory);
-						addCategory(response.data);
+						await updateCategory(editingCategory._id, {
+							name: editingCategory.name,
+							image: editingCategory.image !== editingCategory.imageUrl ? editingCategory.image : undefined,
+						});
+						setEditingCategory(null);
+						toast.success("Categorie actualizată cu succes!");
+					} catch (error) {
+						toast.error(error.response?.data?.message || "Ceva nu a mers bine");
+						return;
+					}
+				} else {
+					try {
+						await addCategory(newCategory);
 						setNewCategory({ name: "", image: "" });
 						toast.success("Categorie creată cu succes!");
-						await fetchCategories();
 					} catch (error) {
 						toast.error(error.response?.data?.message || "Ceva nu a mers bine");
 						return;
 					}
 				}
 			}
+		} catch (error) {
+			toast.error(error.response?.data?.message || "Ceva nu a mers bine");
 		} finally {
 			setLoading(false);
 		}
@@ -111,26 +115,27 @@ const CategoriesTab = () => {
 				toast.success("Subcategorie ștearsă cu succes!");
 				await fetchCategories();
 			} else {
-				await axios.delete(`/categories/${categoryId}`);
-				deleteCategory(categoryId);
+				await deleteCategory(categoryId);
 				toast.success("Categorie ștearsă cu succes!");
-				await fetchCategories();
 			}
 		} catch (error) {
 			toast.error(error.response?.data?.message || "Nu s-a putut șterge elementul");
 		}
 	};
 
-	const startEditing = (item, isSubcategory = false) => {
+	const startEditing = (item, isSubcategory = false, parentCategoryId = null) => {
 		if (isSubcategory) {
 			setEditingSubcategory({
 				...item,
 				image: item.image,
+				imageUrl: item.image,
+				parentCategory: parentCategoryId,
 			});
 		} else {
 			setEditingCategory({
 				...item,
 				image: item.image,
+				imageUrl: item.image,
 			});
 		}
 	};
@@ -179,7 +184,7 @@ const CategoriesTab = () => {
 							/>
 						</div>
 
-						<div className='mt-1 flex items-center'>
+						<div className='mt-1 flex flex-col sm:flex-row sm:items-center gap-2'>
 							<input
 								type='file'
 								id='image'
@@ -216,7 +221,7 @@ const CategoriesTab = () => {
 							</div>
 						)}
 
-						<div className='flex space-x-4'>
+						<div className='flex flex-col sm:flex-row gap-3 sm:space-x-0'>
 							<motion.button
 								type='submit'
 								className='w-full flex items-center justify-center rounded-lg bg-[#2B4EE6] px-6 py-3 text-base font-medium text-white hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#2B4EE6] transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed'
@@ -261,8 +266,8 @@ const CategoriesTab = () => {
 					<div className='space-y-4'>
 						{categories.map((category) => (
 							<div key={category._id} className='bg-gray-900/50 rounded-lg p-4'>
-								<div className='flex items-center justify-between'>
-									<div className='flex items-center space-x-3'>
+								<div className='flex flex-wrap items-center justify-between gap-2'>
+									<div className='flex items-center space-x-3 min-w-0 flex-1'>
 										<button
 											onClick={() => toggleCategory(category._id)}
 											className='text-gray-400 hover:text-white'
@@ -278,7 +283,7 @@ const CategoriesTab = () => {
 											alt={category.name}
 											className='w-12 h-12 rounded-lg object-cover'
 										/>
-										<span className='text-white font-medium'>{category.name}</span>
+										<span className='text-white font-medium truncate'>{category.name}</span>
 									</div>
 									<div className='flex space-x-2'>
 										<button
@@ -298,18 +303,19 @@ const CategoriesTab = () => {
 
 								{/* Subcategories Section */}
 								{expandedCategories[category._id] && (
-									<div className='mt-4 pl-8'>
+									<div className='mt-4 pl-0 sm:pl-8'>
 										{/* Subcategory Form */}
 										<form onSubmit={(e) => handleSubmit(e, true, category._id)} className='mb-4'>
 											<input type="hidden" name="parentCategory" value={category._id} onChange={(e) => setNewSubcategory({ ...newSubcategory, parentCategory: e.target.value })} />
-											<div className='flex space-x-2'>
+											<div className='flex flex-col sm:flex-row gap-2'>
 												<input
 													type='text'
 													placeholder='Nume subcategorie nouă'
 													value={newSubcategory.name}
 													onChange={(e) => setNewSubcategory({ ...newSubcategory, name: e.target.value, parentCategory: category._id })}
-													className='flex-1 bg-gray-900/50 border border-gray-700 rounded-lg px-3 py-2 text-white'
+													className='flex-1 bg-gray-900/50 border border-gray-700 rounded-lg px-3 py-2 text-white min-w-0'
 												/>
+												<div className='flex gap-2'>
 												<input
 													type='file'
 													id={`subcategory-image-${category._id}`}
@@ -320,17 +326,18 @@ const CategoriesTab = () => {
 												<label
 													htmlFor={`subcategory-image-${category._id}`}
 													className='cursor-pointer bg-gray-900/50 py-2 px-3 border border-gray-700 rounded-lg 
-													text-sm text-gray-300 hover:bg-gray-800/50'
+													text-sm text-gray-300 hover:bg-gray-800/50 shrink-0'
 												>
 													<Upload className='h-4 w-4 inline-block mr-1' />
 													Imagine
 												</label>
 												<button
 													type='submit'
-													className='bg-[#2B4EE6] text-white px-4 py-2 rounded-lg hover:bg-blue-600'
+													className='bg-[#2B4EE6] text-white px-4 py-2 rounded-lg hover:bg-blue-600 shrink-0'
 												>
 													Adăugă
 												</button>
+												</div>
 											</div>
 										</form>
 
@@ -348,7 +355,7 @@ const CategoriesTab = () => {
 													</div>
 													<div className='flex space-x-2'>
 														<button
-															onClick={() => startEditing(subcategory, true)}
+															onClick={() => startEditing(subcategory, true, category._id)}
 															className='p-1.5 text-gray-400 hover:text-white hover:bg-gray-700/50 rounded-lg'
 														>
 															<Edit2 className='h-4 w-4' />

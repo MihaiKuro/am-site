@@ -1,5 +1,5 @@
 import { ArrowRight, CheckCircle, HandHeart } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useCartStore } from "../stores/useCartStore";
 import axios from "../lib/axios";
@@ -10,13 +10,20 @@ const PurchaseSuccessPage = () => {
 	const [isProcessing, setIsProcessing] = useState(true);
 	const { clearCart } = useCartStore();
 	const [error, setError] = useState(null);
+	const processedSessionRef = useRef(null);
 
 	useEffect(() => {
 		const handleCheckoutSuccess = async (sessionId) => {
+			const storageKey = `checkout-processed-${sessionId}`;
+			if (processedSessionRef.current === sessionId || sessionStorage.getItem(storageKey)) {
+				setIsProcessing(false);
+				return;
+			}
+			processedSessionRef.current = sessionId;
+
 			try {
-				// Process the successful payment with full URL to avoid any axios config issues
 				const timestamp = Date.now();
-await axios.post(`/payments/checkout-success?_t=${timestamp}`, {
+				await axios.post(`/payments/checkout-success?_t=${timestamp}`, {
 					sessionId,
 				}, {
 					headers: {
@@ -25,20 +32,18 @@ await axios.post(`/payments/checkout-success?_t=${timestamp}`, {
 					},
 					withCredentials: true
 				});
-				
-				// Clear the cart after successful payment
+
+				sessionStorage.setItem(storageKey, "1");
 				await clearCart();
-				toast.success("Order completed successfully! Your cart has been cleared.");
-				
+				toast.success("Comanda a fost finalizată cu succes!");
 			} catch (error) {
 				console.error("Error processing checkout success:", error);
-				// Even if there's an error, try to clear the cart
 				try {
 					await clearCart();
 				} catch (clearError) {
 					console.error("Error clearing cart:", clearError);
 				}
-				setError("There was an issue processing your order, but your payment was successful.");
+				setError("A apărut o problemă la procesarea comenzii, dar plata a fost efectuată cu succes.");
 			} finally {
 				setIsProcessing(false);
 			}
@@ -48,19 +53,18 @@ await axios.post(`/payments/checkout-success?_t=${timestamp}`, {
 		if (sessionId) {
 			handleCheckoutSuccess(sessionId);
 		} else {
-			// If no session ID, still try to clear cart (in case user navigates directly)
 			clearCart().catch(console.error);
 			setIsProcessing(false);
-			setError("No session ID found in the URL");
+			setError("Nu s-a găsit session ID în URL");
 		}
 	}, [clearCart]);
 
 	if (isProcessing) {
 		return (
-			<div className="h-screen flex items-center justify-center">
+			<div className="min-h-[50vh] flex items-center justify-center py-12">
 				<div className="text-center">
 					<div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#2B4EE6] mx-auto mb-4"></div>
-					<p className="text-gray-300">Processing your payment...</p>
+					<p className="text-gray-300">Se procesează plata...</p>
 				</div>
 			</div>
 		);
@@ -68,15 +72,15 @@ await axios.post(`/payments/checkout-success?_t=${timestamp}`, {
 
 	if (error) {
 		return (
-			<div className="h-screen flex items-center justify-center px-4">
+			<div className="min-h-[50vh] flex items-center justify-center py-12 px-4">
 				<div className="max-w-md w-full bg-gray-800 rounded-lg shadow-xl p-6 text-center">
-					<h1 className="text-xl font-bold text-red-400 mb-4">Payment Processing Issue</h1>
+					<h1 className="text-xl font-bold text-red-400 mb-4">Problemă la procesarea comenzii</h1>
 					<p className="text-gray-300 mb-6">{error}</p>
 					<Link
 						to="/"
 						className="bg-[#2B4EE6] hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg transition duration-300"
 					>
-						Return to Home
+						Înapoi acasă
 					</Link>
 				</div>
 			</div>
@@ -84,7 +88,7 @@ await axios.post(`/payments/checkout-success?_t=${timestamp}`, {
 	}
 
 	return (
-		<div className='h-screen flex items-center justify-center px-4'>
+		<div className='min-h-[50vh] flex items-center justify-center py-12 px-4'>
 			<Confetti
 				width={window.innerWidth}
 				height={window.innerHeight}

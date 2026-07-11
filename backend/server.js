@@ -16,6 +16,7 @@ import appointmentRoutes from "./routes/appointment.route.js";
 import mechanicRoutes from "./routes/mechanic.route.js";
 import serviceOrderRoutes from "./routes/serviceOrder.route.js";
 import vehicleRoutes from "./routes/vehicle.route.js";
+import reviewRoutes from "./routes/review.route.js";
 
 
 import { connectDB } from "./lib/db.js";
@@ -50,6 +51,7 @@ app.use("/api/appointments", appointmentRoutes);
 app.use("/api/mechanics", mechanicRoutes);
 app.use("/api/service-orders", serviceOrderRoutes);
 app.use("/api/vehicles", vehicleRoutes);
+app.use("/api/reviews", reviewRoutes);
 
 
 

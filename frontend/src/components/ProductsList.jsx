@@ -3,6 +3,7 @@ import { Trash, Star, ChevronUp, ChevronDown, Search, X, Edit, Filter } from "lu
 import { useProductStore } from "../stores/useProductStore";
 import { useCategoryStore } from "../stores/useCategoryStore";
 import { useState, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 import EditProductForm from "./EditProductForm";
 
 const ProductsList = () => {
@@ -249,22 +250,14 @@ const ProductsList = () => {
 	);
 
 	return (
+		<>
 		<motion.div
-			className='bg-gray-800/50 backdrop-blur-sm border border-gray-700 shadow-lg rounded-lg overflow-hidden p-4 sm:p-5 flex flex-col'
+			className='bg-gray-800/50 backdrop-blur-sm border border-gray-700 shadow-lg rounded-lg p-4 sm:p-5 flex flex-col'
 			initial={{ opacity: 0, y: 20 }}
 			animate={{ opacity: 1, y: 0 }}
 			transition={{ duration: 0.5 }}
 		>
 			<h2 className='text-lg sm:text-2xl font-semibold mb-4 sm:mb-6 text-[#2B4EE6]'>Produse</h2>
-
-			{editingProduct && (
-				<div className='fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4'>
-					<EditProductForm
-						product={editingProduct}
-						onClose={() => setEditingProduct(null)}
-					/>
-				</div>
-			)}
 
 			{/* Mobile search */}
 			<div className="md:hidden mb-4">
@@ -471,7 +464,7 @@ const ProductsList = () => {
 					</div>
 
 					{/* Desktop: table */}
-					<div className='hidden md:block overflow-x-auto overflow-y-auto flex-grow max-h-[calc(100vh-550px)]'>
+					<div className='hidden md:block overflow-x-auto rounded-lg border border-gray-700/50'>
 				<table className='min-w-full divide-y divide-gray-700'>
 					<thead className='bg-gray-900/50 sticky top-0 z-10'>
 						<tr>
@@ -500,8 +493,8 @@ const ProductsList = () => {
 								exit={{ opacity: 0 }}
 								layout
 							>
-								<td className='px-6 py-4'>
-									<div className='flex items-center'>
+								<td className='px-4 lg:px-6 py-4 max-w-xs lg:max-w-md'>
+									<div className='flex items-center min-w-0'>
 										<div className='h-12 w-12 flex-shrink-0'>
 											<img
 												className='h-12 w-12 rounded-lg object-cover'
@@ -509,9 +502,9 @@ const ProductsList = () => {
 												alt={product.name}
 											/>
 										</div>
-										<div className='ml-4'>
-											<div className='text-sm font-medium text-white'>{product.name}</div>
-											<div className='text-sm text-gray-400'>{product.description}</div>
+										<div className='ml-4 min-w-0'>
+											<div className='text-sm font-medium text-white line-clamp-2'>{product.name}</div>
+											<div className='text-sm text-gray-400 line-clamp-1 mt-0.5'>{product.description}</div>
 										</div>
 									</div>
 								</td>
@@ -561,6 +554,25 @@ const ProductsList = () => {
 				</>
 			)}
 		</motion.div>
+
+		{editingProduct && createPortal(
+			<div
+				className='fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4'
+				onClick={() => setEditingProduct(null)}
+			>
+				<div
+					className='w-full sm:max-w-2xl max-h-[100dvh] sm:max-h-[90vh] overflow-hidden'
+					onClick={(e) => e.stopPropagation()}
+				>
+					<EditProductForm
+						product={editingProduct}
+						onClose={() => setEditingProduct(null)}
+					/>
+				</div>
+			</div>,
+			document.body
+		)}
+		</>
 	);
 };
 

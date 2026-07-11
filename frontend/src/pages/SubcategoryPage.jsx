@@ -31,7 +31,7 @@ const SubcategoryPage = () => {
 			<div className='relative z-10 max-w-screen-xl mx-auto px-4 sm:px-6 lg:px-8 py-12'>
 				<div className='text-center space-y-4 mb-12'>
 					<motion.div
-						className='flex items-center justify-center space-x-2 text-gray-400 mb-4'
+						className='flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-sm sm:text-base text-gray-400 mb-4 px-2'
 						initial={{ opacity: 0, y: -20 }}
 						animate={{ opacity: 1, y: 0 }}
 						transition={{ duration: 0.5 }}

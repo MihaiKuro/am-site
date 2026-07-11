@@ -8,8 +8,8 @@ const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:5173';
 
 export const createCheckoutSession = async (req, res) => {
 	try {
-		const { products, couponCode } = req.body;
-		console.log('Received checkout request:', { products, couponCode, userId: req.user?._id });
+		const { products, couponCode, deliveryMethod } = req.body;
+		console.log('Received checkout request:', { products, couponCode, deliveryMethod, userId: req.user?._id });
 
 		// Check authentication
 		if (!req.user || !req.user._id) {
@@ -127,6 +127,7 @@ export const createCheckoutSession = async (req, res) => {
 			metadata: {
 				userId: req.user._id.toString(),
 				couponCode: couponCode || "",
+				deliveryMethod: deliveryMethod || "courier",
 				products: JSON.stringify(
 					products.map((p) => ({
 						id: p._id,
@@ -167,77 +168,110 @@ export const createCheckoutSession = async (req, res) => {
 export const checkoutSuccess = async (req, res) => {
 	try {
 		const { sessionId } = req.body;
+
+		if (!sessionId) {
+			return res.status(400).json({ message: "Session ID is required" });
+		}
+
+		if (!stripe) {
+			return res.status(500).json({ message: "Stripe configuration is missing" });
+		}
+
 		const session = await stripe.checkout.sessions.retrieve(sessionId);
 
-		if (session.payment_status === "paid") {
-			if (session.metadata.couponCode) {
-				await Coupon.findOneAndUpdate(
-					{
-						code: session.metadata.couponCode,
-						userId: session.metadata.userId,
-					},
-					{
-						isActive: false,
-					}
-				);
-			}
+		if (session.payment_status !== "paid") {
+			return res.status(400).json({ message: "Payment not completed" });
+		}
 
-			// Prevent duplicate orders for the same Stripe session
-			const existingOrder = await Order.findOne({ stripeSessionId: sessionId });
-			if (existingOrder) {
-				return res.status(200).json({
-					success: true,
-					message: "Order already processed",
-					orderId: existingOrder._id,
-				});
-			}
-
-			// create a new Order
-			const products = JSON.parse(session.metadata.products);
-
-			// SCĂDEREA STOCULUI pentru fiecare produs
-			const Product = (await import('../models/product.model.js')).default;
-			for (const item of products) {
-				const product = await Product.findById(item.id);
-				if (product) {
-					if (product.stock < item.quantity) {
-						return res.status(400).json({ message: `Insufficient stock for product: ${product.name}` });
-					}
-					product.stock -= item.quantity;
-					await product.save();
-				}
-			}
-
-			await updateFeaturedProductsCache();
-
-			const newOrder = new Order({
-				user: session.metadata.userId,
-				orderItems: products.map((product) => ({
-					product: product.id,
-					quantity: product.quantity,
-					price: Number(product.price)
-				})),
-				totalPrice: session.amount_total / 100, // Stripe amount is in cents
-				shippingAddress: {
-					street: "Online payment - no address",
-					city: "Online",
-					postalCode: "000000",
-					country: "RO"
-				},
-				paymentMethod: "card",
-				isPaid: true,
-				paidAt: new Date(),
-				stripeSessionId: sessionId,
-			});
-
-			await newOrder.save();
-
-			res.status(200).json({
+		// Idempotent: return existing order if already processed
+		const existingOrder = await Order.findOne({ stripeSessionId: sessionId });
+		if (existingOrder) {
+			return res.status(200).json({
 				success: true,
-				message: "Payment successful, order created, and coupon deactivated if used.",
-				orderId: newOrder._id,
+				message: "Order already processed",
+				orderId: existingOrder._id,
 			});
 		}
+
+		if (session.metadata.couponCode) {
+			await Coupon.findOneAndUpdate(
+				{
+					code: session.metadata.couponCode,
+					userId: session.metadata.userId,
+				},
+				{
+					isActive: false,
+				}
+			);
+		}
+
+		const products = JSON.parse(session.metadata.products);
+		const Product = (await import("../models/product.model.js")).default;
+
+		for (const item of products) {
+			const product = await Product.findOneAndUpdate(
+				{ _id: item.id, stock: { $gte: item.quantity } },
+				{ $inc: { stock: -item.quantity } },
+				{ new: true }
+			);
+
+			if (!product) {
+				const existingProduct = await Product.findById(item.id);
+				return res.status(400).json({
+					message: `Insufficient stock for product: ${existingProduct?.name || item.id}`,
+				});
+			}
+		}
+
+		await updateFeaturedProductsCache();
+
+		const newOrder = new Order({
+			user: session.metadata.userId,
+			orderItems: products.map((product) => ({
+				product: product.id,
+				quantity: product.quantity,
+				price: Number(product.price),
+			})),
+			totalPrice: session.amount_total / 100,
+			shippingAddress: {
+				street: session.metadata.deliveryMethod === "pickup" ? "Ridicare din magazin" : "Online payment - no address",
+				city: session.metadata.deliveryMethod === "pickup" ? "Magazin" : "Online",
+				postalCode: session.metadata.deliveryMethod === "pickup" ? "—" : "000000",
+				country: "RO",
+			},
+			paymentMethod: "card",
+			deliveryMethod: session.metadata.deliveryMethod || "courier",
+			isPaid: true,
+			paidAt: new Date(),
+			stripeSessionId: sessionId,
+		});
+
+		try {
+			await newOrder.save();
+		} catch (saveError) {
+			// Race condition: another request already created this order
+			if (saveError.code === 11000) {
+				for (const item of products) {
+					await Product.findByIdAndUpdate(item.id, { $inc: { stock: item.quantity } });
+				}
+
+				const duplicateOrder = await Order.findOne({ stripeSessionId: sessionId });
+				if (duplicateOrder) {
+					return res.status(200).json({
+						success: true,
+						message: "Order already processed",
+						orderId: duplicateOrder._id,
+					});
+				}
+			}
+			throw saveError;
+		}
+
+		res.status(200).json({
+			success: true,
+			message: "Payment successful, order created, and coupon deactivated if used.",
+			orderId: newOrder._id,
+		});
 	} catch (error) {
 		console.error("Error processing successful checkout:", error);
 		res.status(500).json({ message: "Error processing successful checkout", error: error.message });

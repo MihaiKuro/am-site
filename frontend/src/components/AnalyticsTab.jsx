@@ -254,7 +254,7 @@ const AnalyticsTab = () => {
 									<AnalyticsCard title="Vehicule în Service" value={serviceSummary.vehiclesCount} icon={Wrench} color="from-green-400 to-green-900" />
 									<AnalyticsCard title="Valoare Medie Comandă" value={serviceSummary.avgOrder?.toLocaleString(undefined, { maximumFractionDigits: 2 }) + ' RON'} icon={DollarSign} color="from-blue-400 to-blue-900" />
 									<AnalyticsCard title="Încasări Service" value={serviceSummary.totalRevenue?.toLocaleString(undefined, { maximumFractionDigits: 2 }) + ' RON'} icon={DollarSign} color="from-indigo-400 to-indigo-900" />
-									<AnalyticsCard title="Top Intervenții" value={serviceSummary.interventions?.map(i => i._id).join(', ') || '-'} icon={BarChart3} color="from-yellow-400 to-yellow-900" />
+									<AnalyticsCard title="Top Intervenții" value={serviceSummary.interventions?.map(i => i._id).join(', ') || '-'} icon={BarChart3} color="from-yellow-400 to-yellow-900" compact />
 								</div>
 								<div className="bg-gray-900/50 border border-gray-700 rounded-lg p-4 overflow-x-auto">
 									<h3 className="text-lg font-semibold text-white mb-2">Grad Încărcare Mecanici</h3>
@@ -298,17 +298,17 @@ const AnalyticsTab = () => {
 
 export default AnalyticsTab;
 
-const AnalyticsCard = ({ title, value, icon: Icon, color }) => (
+const AnalyticsCard = ({ title, value, icon: Icon, color, compact = false }) => (
 	<motion.div
-		className='bg-gray-800/50 backdrop-blur-sm border border-gray-700 rounded-lg p-6 shadow-lg overflow-hidden relative'
+		className='bg-gray-800/50 backdrop-blur-sm border border-gray-700 rounded-lg p-4 sm:p-6 shadow-lg overflow-hidden relative'
 		initial={{ opacity: 0, y: 20 }}
 		animate={{ opacity: 1, y: 0 }}
 		transition={{ duration: 0.5 }}
 	>
 		<div className='flex justify-between items-center'>
-			<div className='z-10'>
+			<div className='z-10 min-w-0'>
 				<p className='text-[#2B4EE6] text-sm mb-1 font-semibold'>{title}</p>
-				<h3 className='text-white text-3xl font-bold'>{value}</h3>
+				<h3 className={`text-white font-bold break-words ${compact ? 'text-sm sm:text-base leading-snug' : 'text-2xl sm:text-3xl'}`}>{value}</h3>
 			</div>
 		</div>
 		<div className={`absolute inset-0 bg-gradient-to-br ${color} opacity-10`} />

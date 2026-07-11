@@ -2,6 +2,8 @@ import { redis } from "../lib/redis.js";
 import User from "../models/user.model.js";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
+import crypto from "crypto";
+import { sendPasswordResetEmail } from "../lib/mailer.js";
 
 const generateTokens = (userId) => {
 	const accessToken = jwt.sign({ userId }, process.env.ACCESS_TOKEN_SECRET, {
@@ -212,6 +214,85 @@ export const updateProfile = async (req, res) => {
 		res.json(userResponse);
 	} catch (error) {
 		console.error("Error in updateProfile:", error);
+		res.status(500).json({ message: "Server error", error: error.message });
+	}
+};
+
+export const requestPasswordReset = async (req, res) => {
+	try {
+		const { email } = req.body;
+		if (!email) {
+			return res.status(400).json({ message: "Email is required" });
+		}
+
+		const user = await User.findOne({ email: email.toLowerCase() });
+		if (!user) {
+			return res.status(404).json({ message: "No account found with that email" });
+		}
+
+		const resetToken = crypto.randomBytes(32).toString("hex");
+		const resetTokenHash = crypto.createHash("sha256").update(resetToken).digest("hex");
+		const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+
+		user.resetPasswordToken = resetTokenHash;
+		user.resetPasswordExpiresAt = expiresAt;
+		await user.save();
+
+		const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+		const resetUrl = `${frontendUrl}/forgot-password?token=${resetToken}`;
+
+		try {
+			await sendPasswordResetEmail({
+				to: user.email,
+				resetUrl
+			});
+
+			res.json({
+				success: true,
+				message: "If an account exists, a reset link has been sent to your email."
+			});
+		} catch (emailError) {
+			console.error("Failed to send password reset email:", emailError.message);
+			res.json({
+				success: true,
+				message: process.env.NODE_ENV === "production"
+					? "The reset link was generated, but email delivery is not configured on this server."
+					: "The reset link was generated. Use the link below for testing.",
+				resetUrl,
+				token: resetToken
+			});
+		}
+	} catch (error) {
+		console.error("Error in requestPasswordReset:", error);
+		res.status(500).json({ message: "Server error", error: error.message });
+	}
+};
+
+export const resetPassword = async (req, res) => {
+	try {
+		const { token, newPassword } = req.body;
+		if (!token || !newPassword) {
+			return res.status(400).json({ message: "Token and new password are required" });
+		}
+
+		const resetTokenHash = crypto.createHash("sha256").update(token).digest("hex");
+		const user = await User.findOne({
+			resetPasswordToken: resetTokenHash,
+			resetPasswordExpiresAt: { $gt: Date.now() }
+		});
+
+		if (!user) {
+			return res.status(400).json({ message: "Invalid or expired reset token" });
+		}
+
+		user.password = newPassword;
+		user.resetPasswordToken = undefined;
+		user.resetPasswordExpiresAt = undefined;
+		await user.save();
+
+		res.json({ success: true, message: "Password updated successfully" });
+	} catch (error) {
+		console.error("Error in resetPassword:", error);
 		res.status(500).json({ message: "Server error", error: error.message });
 	}
 };

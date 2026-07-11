@@ -146,7 +146,8 @@ const ProfileVehiclesPage = () => {
         try {
             const res = await axios.get(`/service-orders/history?licensePlate=${encodeURIComponent(vehicle.licensePlate)}`);
             setHistory(res.data.history || []);
-        } catch {
+        } catch (e) {
+            toast.error(e.response?.data?.message || "Eroare la încărcarea istoricului");
             setHistory([]);
         } finally {
             setHistoryLoading(false);
@@ -155,13 +156,13 @@ const ProfileVehiclesPage = () => {
 
     return (
         <div className="max-w-2xl mx-auto">
-            <div className="flex justify-between items-center mb-6">
-                <h2 className="text-2xl font-bold text-white">Vehiculele Mele</h2>
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
+                <h2 className="text-xl sm:text-2xl font-bold text-white">Vehiculele Mele</h2>
                 <motion.button
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
                     onClick={() => { setShowForm(true); setEditingVehicle(null); }}
-                    className="px-4 py-2 rounded-lg bg-[#2B4EE6] text-white"
+                    className="w-full sm:w-auto px-4 py-2.5 rounded-lg bg-[#2B4EE6] text-white shrink-0"
                 >
                     <Plus size={16} className="inline-block mr-1" /> Adaugă Vehicul
                 </motion.button>
@@ -195,13 +196,29 @@ const ProfileVehiclesPage = () => {
                 </div>
             )}
             {showHistory && (
-                <div className="bg-gray-900 border border-gray-700 rounded-lg p-6 mt-6">
-                    <h3 className="text-xl font-bold text-white mb-4">Istoric Service pentru {historyVehicle?.make} {historyVehicle?.model} ({historyVehicle?.licensePlate})</h3>
+                <div className="bg-gray-900 border border-gray-700 rounded-lg p-4 sm:p-6 mt-6">
+                    <h3 className="text-lg sm:text-xl font-bold text-white mb-4">Istoric Service pentru {historyVehicle?.make} {historyVehicle?.model} ({historyVehicle?.licensePlate})</h3>
                     {historyLoading ? (
                         <div className="text-gray-400">Se încarcă...</div>
                     ) : history.length === 0 ? (
                         <div className="text-gray-400">Nu există intervenții pentru acest vehicul.</div>
                     ) : (
+                        <>
+                        <div className="md:hidden space-y-3">
+                            {history.map((h) => (
+                                <div key={h._id} className="bg-gray-800 border border-gray-700 rounded-lg p-4 space-y-2">
+                                    <p className="text-white font-medium">{h.createdAt ? new Date(h.createdAt).toLocaleDateString() : '-'}</p>
+                                    <p className="text-sm text-gray-300"><span className="text-gray-500">Lucrări:</span> {h.worksPerformed || '-'}</p>
+                                    <p className="text-sm text-gray-300"><span className="text-gray-500">Piese:</span> {h.partsUsed?.map(p => p.name).join(', ') || '-'}</p>
+                                    <div className="flex flex-wrap gap-3 text-sm">
+                                        <span className="text-green-400 font-medium">{h.totalCost} RON</span>
+                                        <span className="text-gray-400">{h.mechanic?.name || '-'}</span>
+                                        <span className="text-gray-400">{h.status || '-'}</span>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                        <div className="hidden md:block overflow-x-auto">
                         <table className="min-w-full bg-gray-800 border border-gray-700 rounded-lg">
                             <thead>
                                 <tr>
@@ -226,8 +243,10 @@ const ProfileVehiclesPage = () => {
                                 ))}
                             </tbody>
                         </table>
+                        </div>
+                        </>
                     )}
-                    <button className="mt-4 px-4 py-2 rounded bg-gray-700 text-white" onClick={() => setShowHistory(false)}>Închide</button>
+                    <button className="mt-4 w-full sm:w-auto px-4 py-2.5 rounded bg-gray-700 text-white" onClick={() => setShowHistory(false)}>Închide</button>
                 </div>
             )}
         </div>

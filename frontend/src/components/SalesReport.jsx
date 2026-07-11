@@ -174,16 +174,16 @@ const SalesReport = () => {
 						</div>
 					</div>
 
-					<div className="flex gap-2 mt-4">
+					<div className="flex flex-col sm:flex-row gap-2 mt-4">
 						<button
 							onClick={handleApplyFilters}
-							className="px-4 py-2 bg-[#2B4EE6] text-white rounded-lg hover:bg-blue-700 transition-colors"
+							className="w-full sm:w-auto px-4 py-2.5 bg-[#2B4EE6] text-white rounded-lg hover:bg-blue-700 transition-colors"
 						>
 							Aplică Filtrele
 						</button>
 						<button
 							onClick={handleResetFilters}
-							className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+							className="w-full sm:w-auto px-4 py-2.5 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
 						>
 							Resetează
 						</button>
@@ -222,8 +222,43 @@ const SalesReport = () => {
 				</div>
 			)}
 
-			{/* Tabel cu produse */}
-			<div className="overflow-x-auto">
+			{/* Mobile cards */}
+			<div className="md:hidden space-y-3">
+				{salesReport.map((product, index) => (
+					<div key={product._id} className="bg-gray-800/50 border border-gray-700 rounded-lg p-4">
+						<div className="flex items-start gap-3 mb-3">
+							<div className={`w-8 h-8 shrink-0 rounded-full ${getStatusColor(index)} flex items-center justify-center text-white font-bold text-sm`}>
+								{index + 1}
+							</div>
+							<div className="min-w-0 flex-1">
+								<p className="font-medium text-white line-clamp-2">{product.productName}</p>
+								<p className="text-sm text-gray-400 mt-0.5">Preț: {formatCurrency(product.productPrice)}</p>
+							</div>
+						</div>
+						<div className="grid grid-cols-2 gap-2 text-sm">
+							<div>
+								<p className="text-gray-500 text-xs">Categorie</p>
+								<p className="text-gray-300 truncate">{product.categoryName}</p>
+							</div>
+							<div>
+								<p className="text-gray-500 text-xs">Cantitate</p>
+								<p className="text-gray-300">{product.totalQuantity} buc.</p>
+							</div>
+							<div>
+								<p className="text-gray-500 text-xs">Venit</p>
+								<p className="text-green-400 font-medium">{formatCurrency(product.totalRevenue)}</p>
+							</div>
+							<div>
+								<p className="text-gray-500 text-xs">% din total</p>
+								<p className="text-gray-300">{getProductPercentage(product.totalRevenue)}%</p>
+							</div>
+						</div>
+					</div>
+				))}
+			</div>
+
+			{/* Desktop table */}
+			<div className="hidden md:block overflow-x-auto">
 				<table className="min-w-full bg-gray-800/30 border border-gray-700 rounded-lg">
 					<thead className="bg-gray-700/50">
 						<tr>

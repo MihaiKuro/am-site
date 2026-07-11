@@ -17,6 +17,11 @@ export const createCategory = async (req, res) => {
 	try {
 		const { name, image, subcategories } = req.body;
 
+		// Validate required fields
+		if (!name || !image) {
+			return res.status(400).json({ message: "Name and image are required" });
+		}
+
 		// Check if category already exists
 		const existingCategory = await Category.findOne({ name });
 		if (existingCategory) {
@@ -40,7 +45,7 @@ export const createCategory = async (req, res) => {
 		const category = await Category.create({
 			name,
 			slug,
-			image: cloudinaryResponse?.secure_url || "",
+			image: cloudinaryResponse.secure_url,
 			subcategories: subcategories || [],
 		});
 

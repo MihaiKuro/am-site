@@ -26,6 +26,8 @@ import CartPage from "./pages/CartPage";
 import { useCartStore } from "./stores/useCartStore";
 import PurchaseSuccessPage from "./pages/PurchaseSuccessPage";
 import PurchaseCancelPage from "./pages/PurchaseCancelPage";
+import ForgotPasswordPage from "./pages/ForgotPasswordPage";
+import ProductDetailPage from "./pages/ProductDetailPage";
 
 function App() {
 	const checkAuth = useUserStore((s)=>s.checkAuth);
@@ -49,7 +51,7 @@ function App() {
 	if (checkingAuth) return <LoadingSpinner />;
 
 	return (
-		<div className='min-h-screen flex flex-col bg-[#0B0F17] text-white'>
+		<div className='min-h-screen flex flex-col bg-[#0B0F17] text-white overflow-x-hidden'>
 			{/* Navigation background */}
 			<div className='absolute top-0 left-0 right-0 h-32 bg-[#2B4EE6] z-0' />
 
@@ -62,6 +64,7 @@ function App() {
 						<Route path='/categories' element={<CategoriesPage />} />
 						<Route path='/signup' element={!user ? <SignUpPage /> : <Navigate to='/' />} />
 						<Route path='/login' element={!user ? <LoginPage /> : <Navigate to='/' />} />
+						<Route path='/forgot-password' element={!user ? <ForgotPasswordPage /> : <Navigate to='/' />} />
 						
 						{/* Profile Routes */}
 						<Route path="/profile" element={user ? <ProfileLayout /> : <Navigate to="/login" />}>
@@ -80,6 +83,7 @@ function App() {
 						/>
 						<Route path='/category/:category' element={<CategoryPage />} />
 						<Route path='/category/:category/:subcategory' element={<SubcategoryPage />} />
+						<Route path='/product/:id' element={<ProductDetailPage />} />
 						<Route path='/cart' element={user ? <CartPage /> : <Navigate to='/login' />} />
 						<Route
 							path='/purchase-success'

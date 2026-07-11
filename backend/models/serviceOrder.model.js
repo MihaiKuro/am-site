@@ -21,7 +21,9 @@ const statusHistorySchema = new mongoose.Schema({
 
 const serviceOrderSchema = new mongoose.Schema({
   user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
-  vehicle: { type: String, required: true }, // sau ObjectId dacă ai model separat
+  vehicle: { type: String, required: true },
+  licensePlate: { type: String },
+  vin: { type: String },
   appointment: { type: mongoose.Schema.Types.ObjectId, ref: "Appointment" },
   mechanic: { type: mongoose.Schema.Types.ObjectId, ref: "Mechanic" },
   status: {

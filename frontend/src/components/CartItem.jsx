@@ -15,22 +15,22 @@ const CartItem = ({ item }) => {
 				<div className='flex items-center justify-between md:order-3 md:justify-end'>
 					<div className='flex items-center gap-2'>
 						<button
-							className='inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md border
+							className='inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border
 							 border-gray-600 bg-gray-700/50 hover:bg-gray-600 focus:outline-none focus:ring-2
 							  focus:ring-[#2B4EE6]'
 							onClick={() => updateQuantity(item._id, item.quantity - 1)}
 						>
-							<Minus className='text-gray-300' />
+							<Minus className='text-gray-300' size={16} />
 						</button>
-						<p>{item.quantity}</p>
+						<p className='min-w-[1.5rem] text-center'>{item.quantity}</p>
 						<button
-							className={`inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md border
+							className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border
 							 border-gray-600 bg-gray-700/50 hover:bg-gray-600 focus:outline-none 
 						focus:ring-2 focus:ring-[#2B4EE6] ${item.quantity >= item.stock ? 'opacity-50 cursor-not-allowed' : ''}`}
 							onClick={() => updateQuantity(item._id, item.quantity + 1)}
 							disabled={item.quantity >= item.stock}
 						>
-							<Plus className='text-gray-300' />
+							<Plus className='text-gray-300' size={16} />
 						</button>
 					</div>
 
@@ -43,10 +43,10 @@ const CartItem = ({ item }) => {
 				</div>
 
 				<div className='w-full min-w-0 flex-1 space-y-4 md:order-2 md:max-w-md'>
-					<p className='text-base font-medium text-white hover:text-[#2B4EE6] hover:underline'>
+					<p className='text-base font-medium text-white hover:text-[#2B4EE6] hover:underline line-clamp-2'>
 						{item.name}
 					</p>
-					<p className='text-sm text-gray-400'>{item.description}</p>
+					<p className='text-sm text-gray-400 line-clamp-2'>{item.description}</p>
 
 					<div className='flex items-center gap-4'>
 						<button

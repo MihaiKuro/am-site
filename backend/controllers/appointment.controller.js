@@ -1,4 +1,5 @@
 import Appointment from "../models/appointment.model.js";
+import { resolveVehicleDetails } from "../lib/vehicleDetails.js";
 
 // Creează o programare nouă
 export const createAppointment = async (req, res) => {
@@ -29,8 +30,23 @@ export const createAppointment = async (req, res) => {
 // Listare programări proprii
 export const getMyAppointments = async (req, res) => {
   try {
-    const appointments = await Appointment.find({ user: req.user._id }).sort({ date: -1 });
-    res.json({ success: true, appointments });
+    const appointments = await Appointment.find({ user: req.user._id })
+      .populate("mechanic", "name")
+      .sort({ date: -1 })
+      .lean();
+
+    const enrichedAppointments = await Promise.all(
+      appointments.map(async (appointment) => {
+        const vehicleDetails = await resolveVehicleDetails(appointment.vehicle);
+        return {
+          ...appointment,
+          vehicleLabel: vehicleDetails.label,
+          vehicleLicensePlate: vehicleDetails.licensePlate,
+        };
+      })
+    );
+
+    res.json({ success: true, appointments: enrichedAppointments });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
@@ -79,10 +95,23 @@ export const getReservedSlots = async (req, res) => {
 export const getAllAppointments = async (req, res) => {
   try {
     const appointments = await Appointment.find()
-      .populate('user', 'firstName lastName email')
-      .populate('mechanic', 'name email phone')
-      .sort({ date: -1 });
-    res.json({ success: true, appointments });
+      .populate("user", "firstName lastName email")
+      .populate("mechanic", "name email phone")
+      .sort({ date: -1 })
+      .lean();
+
+    const enrichedAppointments = await Promise.all(
+      appointments.map(async (appointment) => {
+        const vehicleDetails = await resolveVehicleDetails(appointment.vehicle);
+        return {
+          ...appointment,
+          vehicleLabel: vehicleDetails.label,
+          vehicleLicensePlate: vehicleDetails.licensePlate,
+        };
+      })
+    );
+
+    res.json({ success: true, appointments: enrichedAppointments });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

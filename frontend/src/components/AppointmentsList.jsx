@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import axios from "../lib/axios";
+import toast from "react-hot-toast";
 
 const STATUS_OPTIONS = ["În așteptare", "Confirmată", "Finalizată", "Anulată"];
 
@@ -12,7 +13,8 @@ const getUserLabel = (user) => {
 	return name || user.email || "-";
 };
 
-const getVehicleLabel = (vehicle) => {
+const getVehicleLabel = (vehicle, appt) => {
+	if (appt?.vehicleLabel) return appt.vehicleLabel;
 	if (!vehicle) return "-";
 	if (typeof vehicle === "string") return vehicle;
 	if (vehicle.make || vehicle.model) {
@@ -45,6 +47,103 @@ export default function AppointmentsList() {
 	const [sortDir, setSortDir] = useState("desc");
 	const [mechanics, setMechanics] = useState([]);
 	const [showFilters, setShowFilters] = useState(false);
+	const [completionOpenId, setCompletionOpenId] = useState(null);
+	const [completionDrafts, setCompletionDrafts] = useState({});
+	const [completionSavingId, setCompletionSavingId] = useState(null);
+
+	const updateDraft = (id, field, value) => {
+		setCompletionDrafts((prev) => ({
+			...prev,
+			[id]: { ...(prev[id] || {}), [field]: value },
+		}));
+	};
+
+	const handleCompleteAppointment = async (id) => {
+		const draft = completionDrafts[id] || {};
+		if (!draft.worksPerformed?.trim() && !draft.partsUsed?.trim() && (draft.laborHours === undefined || draft.laborHours === null || draft.laborHours === "")) {
+			return toast.error("Completează cel puțin lucrările efectuate, piese folosite sau ore de lucru.");
+		}
+
+		setCompletionSavingId(id);
+		try {
+			const res = await axios.post(`/service-orders/from-appointment/${id}`, {
+				worksPerformed: draft.worksPerformed || "",
+				partsUsed: draft.partsUsed || "",
+				laborHours: draft.laborHours || "",
+				notes: draft.notes || "",
+			});
+
+			setAppointments((appts) => appts.map((a) => (a._id === id ? res.data.appointment : a)));
+			setCompletionOpenId(null);
+			setCompletionDrafts((prev) => ({ ...prev, [id]: {} }));
+			toast.success("Programare finalizată");
+		} catch (e) {
+			toast.error(e.response?.data?.message || "Eroare la salvarea completării");
+		} finally {
+			setCompletionSavingId(null);
+		}
+	};
+
+	const renderCompletionForm = (appt) => {
+		if (completionOpenId !== appt._id) return null;
+		const draft = completionDrafts[appt._id] || {};
+		if (appt.status === "Finalizată" || appt.status === "Anulată") return null;
+
+		return (
+			<div className="mt-3 rounded-lg border border-blue-700/40 bg-slate-950 p-3">
+				<div className="mb-3 text-sm font-semibold text-blue-200">Detalii service</div>
+				<label className="block mb-3 text-sm text-slate-200">
+					Lucrări efectuate
+					<textarea
+						className="mt-1 w-full rounded-md border border-slate-700 bg-slate-900 p-2 text-white"
+						rows="3"
+						value={draft.worksPerformed || ""}
+						onChange={(e) => updateDraft(appt._id, "worksPerformed", e.target.value)}
+						placeholder="Ex: schimbat filtru ulei, verificat frâne"
+					/>
+				</label>
+				<label className="block mb-3 text-sm text-slate-200">
+					Piese folosite
+					<input
+						className="mt-1 w-full rounded-md border border-slate-700 bg-slate-900 p-2 text-white"
+						value={draft.partsUsed || ""}
+						onChange={(e) => updateDraft(appt._id, "partsUsed", e.target.value)}
+						placeholder="Ex: filtru ulei, bujie"
+					/>
+				</label>
+				<label className="block mb-3 text-sm text-slate-200">
+					Ore de lucru
+					<input
+						type="number"
+						min="0"
+						step="0.5"
+						className="mt-1 w-full rounded-md border border-slate-700 bg-slate-900 p-2 text-white"
+						value={draft.laborHours || ""}
+						onChange={(e) => updateDraft(appt._id, "laborHours", e.target.value)}
+						placeholder="0"
+					/>
+				</label>
+				<label className="block mb-3 text-sm text-slate-200">
+					Notă
+					<textarea
+						className="mt-1 w-full rounded-md border border-slate-700 bg-slate-900 p-2 text-white"
+						rows="2"
+						value={draft.notes || ""}
+						onChange={(e) => updateDraft(appt._id, "notes", e.target.value)}
+						placeholder="Observații"
+					/>
+				</label>
+				<button
+					type="button"
+					className="rounded-lg bg-[#2B4EE6] px-4 py-2 text-sm text-white hover:bg-[#1f3bbe]"
+					onClick={() => handleCompleteAppointment(appt._id)}
+					disabled={completionSavingId === appt._id}
+				>
+					{completionSavingId === appt._id ? "Se salvează..." : "Marchează ca finalizată"}
+				</button>
+			</div>
+		);
+	};
 
 	useEffect(() => {
 		const fetchMechanics = async () => {
@@ -124,12 +223,20 @@ export default function AppointmentsList() {
 
 	const renderActions = (appt) => (
 		<div className="flex flex-wrap gap-2">
-			{appt.status !== "Confirmată" && appt.status !== "Anulată" && (
+			{appt.status !== "Confirmată" && appt.status !== "Anulată" && appt.status !== "Finalizată" && (
 				<button
 					className="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-lg text-sm"
 					onClick={() => handleConfirm(appt._id)}
 				>
 					Confirmă
+				</button>
+			)}
+			{appt.status !== "Anulată" && appt.status !== "Finalizată" && (
+				<button
+					className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg text-sm"
+					onClick={() => setCompletionOpenId((prev) => (prev === appt._id ? null : appt._id))}
+				>
+					{completionOpenId === appt._id ? "Ascunde" : "Completează"}
 				</button>
 			)}
 			{appt.status !== "Anulată" && (
@@ -236,7 +343,7 @@ export default function AppointmentsList() {
 									</p>
 									<p className="text-gray-300">
 										<span className="text-gray-500">Vehicul: </span>
-										{getVehicleLabel(appt.vehicle)}
+										{getVehicleLabel(appt.vehicle, appt)}
 									</p>
 									{appt.note && (
 										<p className="text-gray-400 text-xs">
@@ -247,6 +354,7 @@ export default function AppointmentsList() {
 								</div>
 
 								{renderActions(appt)}
+								{renderCompletionForm(appt)}
 							</div>
 						))}
 					</div>
@@ -268,18 +376,25 @@ export default function AppointmentsList() {
 							</thead>
 							<tbody>
 								{filtered.map((appt) => (
-									<tr key={appt._id} className="border-t border-gray-700">
+									<Fragment key={appt._id}>
+									<tr className="border-t border-gray-700">
 										<td className="px-4 py-2 text-white whitespace-nowrap">
 											{appt.date ? new Date(appt.date).toLocaleString("ro-RO") : "-"}
 										</td>
 										<td className="px-4 py-2 text-gray-300">{getUserLabel(appt.user)}</td>
 										<td className="px-4 py-2 text-gray-300">{appt.mechanic?.name || "-"}</td>
 										<td className="px-4 py-2 text-gray-300">{appt.serviceType}</td>
-										<td className="px-4 py-2 text-gray-300">{getVehicleLabel(appt.vehicle)}</td>
+										<td className="px-4 py-2 text-gray-300">{getVehicleLabel(appt.vehicle, appt)}</td>
 										<td className="px-4 py-2 text-gray-300">{appt.status}</td>
 										<td className="px-4 py-2 text-gray-300 max-w-[200px] truncate">{appt.note || "-"}</td>
 										<td className="px-4 py-2 text-gray-300">{renderActions(appt)}</td>
 									</tr>
+									{completionOpenId === appt._id && (
+										<tr className="border-t border-gray-700">
+											<td colSpan={8} className="px-4 py-3">{renderCompletionForm(appt)}</td>
+										</tr>
+									)}
+									</Fragment>
 								))}
 							</tbody>
 						</table>

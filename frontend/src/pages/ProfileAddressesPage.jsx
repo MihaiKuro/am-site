@@ -49,7 +49,7 @@ const AddressForm = ({ address, onSubmit, onCancel }) => {
                     required
                 />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                     <label htmlFor="city" className="block text-sm font-medium text-gray-300 mb-1">
                         Oraș
@@ -296,13 +296,13 @@ const ProfileAddressesPage = () => {
 
     return (
         <div className="space-y-6">
-            <div className="flex justify-between items-center">
-                <h2 className="text-2xl font-bold text-white">Adresele Mele</h2>
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+                <h2 className="text-xl sm:text-2xl font-bold text-white">Adresele Mele</h2>
                 <motion.button
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
                     onClick={() => setShowForm(true)}
-                    className="flex items-center gap-2 px-4 py-2 bg-[#2B4EE6] text-white rounded-lg hover:bg-blue-600 transition-colors"
+                    className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2.5 bg-[#2B4EE6] text-white rounded-lg hover:bg-blue-600 transition-colors shrink-0"
                 >
                     <Plus size={20} />
                     Adaugă Adresă

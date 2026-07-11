@@ -5,6 +5,7 @@ import LoadingSpinner from "./LoadingSpinner";
 import { Filter, Trash } from "lucide-react";
 import useAnalyticsStore from '../stores/useAnalyticsStore';
 import axios from '../lib/axios';
+import { getDeliveryMethodLabel, getPaymentMethodLabel, getOrderStatusLabel, getOrderStatusOptions, getOrderStatusClass, FILTER_STATUS_OPTIONS } from '../lib/orderLabels';
 
 const OrdersList = () => {
 	const { orders, loading, error, fetchAllOrders, fetchFilteredOrders, updateOrderStatus, deleteOrder } = useOrderStore();
@@ -16,13 +17,6 @@ const OrdersList = () => {
 	const [filterStartDate, setFilterStartDate] = useState('');
 	const [filterEndDate, setFilterEndDate] = useState('');
 	const [editingStatusId, setEditingStatusId] = useState(null);
-	const statusMap = {
-		"Pending": "În așteptare",
-		"Shipped": "Expediată",
-		"Delivered": "Livrată",
-		"Cancelled": "Anulată",
-	};
-	const statusOptions = Object.entries(statusMap);
 
 	const getUserLabel = (user) => {
 		if (!user) return "—";
@@ -30,18 +24,7 @@ const OrdersList = () => {
 		return user.email || "—";
 	};
 
-	const getStatusClass = (status) => {
-		switch (status) {
-			case "Pending":
-				return "bg-yellow-100 text-yellow-800";
-			case "Shipped":
-				return "bg-blue-100 text-blue-800";
-			case "Delivered":
-				return "bg-green-100 text-green-800";
-			default:
-				return "bg-gray-100 text-gray-800";
-		}
-	};
+	const getStatusClass = (status) => getOrderStatusClass(status);
 
 	const handleStatusChange = async (orderId, currentStatus, newStatus) => {
 		if (newStatus !== currentStatus) {
@@ -60,6 +43,8 @@ const OrdersList = () => {
 	};
 
 	const renderStatusControl = (order, { mobile = false } = {}) => {
+		const statusOptions = getOrderStatusOptions(order.deliveryMethod);
+
 		if (mobile || editingStatusId === order._id) {
 			return (
 				<select
@@ -80,8 +65,9 @@ const OrdersList = () => {
 			<span
 				onClick={() => setEditingStatusId(order._id)}
 				className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full cursor-pointer hover:ring-2 hover:ring-[#2B4EE6] ${getStatusClass(order.status)}`}
+				title={order.deliveryMethod === 'pickup' ? 'Status ridicare din magazin' : 'Status livrare curier'}
 			>
-				{statusMap[order.status] || order.status}
+				{getOrderStatusLabel(order.status, order.deliveryMethod)}
 			</span>
 		);
 	};
@@ -178,7 +164,7 @@ const OrdersList = () => {
 								className='mt-1 block w-full bg-gray-800/50 border border-gray-700 rounded-md py-2 px-3 text-white'
 							>
 								<option value=''>Toate statusurile</option>
-								{statusOptions.map(([en, ro]) => (
+								{FILTER_STATUS_OPTIONS.map(([en, ro]) => (
 									<option key={en} value={en}>{ro}</option>
 								))}
 							</select>
@@ -271,11 +257,16 @@ const OrdersList = () => {
 										{getUserLabel(order.user)}
 									</p>
 									<p className="text-gray-300">
+										<span className="text-gray-500">Livrare: </span>
+										{getDeliveryMethodLabel(order.deliveryMethod)}
+									</p>
+									<p className="text-gray-300">
 										<span className="text-gray-500">Plată: </span>
+										{getPaymentMethodLabel(order.paymentMethod, order.deliveryMethod)}
 										{order.isPaid ? (
-											<span className="text-green-400">Plătită</span>
+											<span className="text-green-400 ml-2">· Achitată</span>
 										) : (
-											<span className="text-red-400">Neplătită</span>
+											<span className="text-yellow-400 ml-2">· Neachitată</span>
 										)}
 									</p>
 								</div>
@@ -317,6 +308,12 @@ const OrdersList = () => {
 								Status
 							</th>
 							<th className='px-6 py-4 text-left text-xs font-medium text-gray-300 uppercase tracking-wider'>
+								Livrare
+							</th>
+							<th className='px-6 py-4 text-left text-xs font-medium text-gray-300 uppercase tracking-wider'>
+								Metodă plată
+							</th>
+							<th className='px-6 py-4 text-left text-xs font-medium text-gray-300 uppercase tracking-wider'>
 								Plătită
 							</th>
 							<th className='px-6 py-4 text-left text-xs font-medium text-gray-300 uppercase tracking-wider'>Acțiuni</th>
@@ -346,6 +343,12 @@ const OrdersList = () => {
 								</td>
 								<td className='px-6 py-4 whitespace-nowrap'>
 									{renderStatusControl(order)}
+								</td>
+								<td className='px-6 py-4 whitespace-nowrap text-sm text-gray-300'>
+									{getDeliveryMethodLabel(order.deliveryMethod)}
+								</td>
+								<td className='px-6 py-4 whitespace-nowrap text-sm text-gray-300'>
+									{getPaymentMethodLabel(order.paymentMethod, order.deliveryMethod)}
 								</td>
 								<td className='px-6 py-4 whitespace-nowrap'>
 									{order.isPaid ? (

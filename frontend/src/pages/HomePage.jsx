@@ -6,7 +6,7 @@ import FeaturedProducts from "../components/FeaturedProducts";
 import ServiceAppointment from "../components/ServiceAppointment";
 
 const HomePage = () => {
-	const { fetchFeaturedProducts, products, isLoading } = useProductStore();
+	const { fetchFeaturedProducts, products, loading } = useProductStore();
 	const { categories, fetchCategories } = useCategoryStore();
 
 	useEffect(() => {
@@ -104,8 +104,8 @@ const HomePage = () => {
 			</div>
 
 			{/* Featured Products Section */}
-			{!isLoading && products.length > 0 && <FeaturedProducts featuredProducts={products} />}
-			{!isLoading && <ServiceAppointment />}
+			{!loading && products.length > 0 && <FeaturedProducts featuredProducts={products} />}
+			{!loading && <ServiceAppointment />}
 		</div>
 	);
 };

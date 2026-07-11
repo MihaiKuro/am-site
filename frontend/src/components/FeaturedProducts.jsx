@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { ShoppingCart, ChevronLeft, ChevronRight, Star } from "lucide-react";
+import { ShoppingCart, ChevronLeft, ChevronRight } from "lucide-react";
 import { useCartStore } from "../stores/useCartStore";
 import { Link } from "react-router-dom";
 import toast from "react-hot-toast";
+import ProductRating from "./ProductRating";
 
 const FeaturedProducts = ({ featuredProducts }) => {
 	const [currentIndex, setCurrentIndex] = useState(0);
@@ -46,18 +47,6 @@ const FeaturedProducts = ({ featuredProducts }) => {
 			return;
 		}
 		addToCart(product);
-	};
-
-	const renderStars = (rating) => {
-		return [...Array(5)].map((_, index) => (
-			<Star
-				key={index}
-				size={16}
-				className={`${
-					index < Math.floor(rating) ? 'text-yellow-400 fill-yellow-400' : 'text-gray-400'
-				}`}
-			/>
-		));
 	};
 
 	return (
@@ -112,11 +101,8 @@ const FeaturedProducts = ({ featuredProducts }) => {
 									>
 										{product.name}
 									</Link>
-									<div className='flex items-center gap-1 my-2'>
-										{renderStars(product.rating)}
-										<span className='text-gray-400 text-sm ml-1'>
-											({product.reviewCount})
-										</span>
+									<div className='my-2'>
+										<ProductRating rating={product.rating} reviewCount={product.reviewCount} />
 									</div>
 									<div className='flex items-baseline gap-2 mb-2'>
 										<span className='text-xl font-bold text-white'>
