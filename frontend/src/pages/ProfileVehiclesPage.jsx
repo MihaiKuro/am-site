@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Car, Plus, Pencil, Trash2, Check, X } from "lucide-react";
 import { toast } from "react-hot-toast";
 import axios from "../lib/axios";
+import ServiceOrderSummary from "../components/ServiceOrderSummary";
 
 const VehicleForm = ({ vehicle, onSubmit, onCancel }) => {
     const [formData, setFormData] = useState({
@@ -203,48 +204,11 @@ const ProfileVehiclesPage = () => {
                     ) : history.length === 0 ? (
                         <div className="text-gray-400">Nu există intervenții pentru acest vehicul.</div>
                     ) : (
-                        <>
-                        <div className="md:hidden space-y-3">
+                        <div className="space-y-3">
                             {history.map((h) => (
-                                <div key={h._id} className="bg-gray-800 border border-gray-700 rounded-lg p-4 space-y-2">
-                                    <p className="text-white font-medium">{h.createdAt ? new Date(h.createdAt).toLocaleDateString() : '-'}</p>
-                                    <p className="text-sm text-gray-300"><span className="text-gray-500">Lucrări:</span> {h.worksPerformed || '-'}</p>
-                                    <p className="text-sm text-gray-300"><span className="text-gray-500">Piese:</span> {h.partsUsed?.map(p => p.name).join(', ') || '-'}</p>
-                                    <div className="flex flex-wrap gap-3 text-sm">
-                                        <span className="text-green-400 font-medium">{h.totalCost} RON</span>
-                                        <span className="text-gray-400">{h.mechanic?.name || '-'}</span>
-                                        <span className="text-gray-400">{h.status || '-'}</span>
-                                    </div>
-                                </div>
+                                <ServiceOrderSummary key={h._id} entry={h} />
                             ))}
                         </div>
-                        <div className="hidden md:block overflow-x-auto">
-                        <table className="min-w-full bg-gray-800 border border-gray-700 rounded-lg">
-                            <thead>
-                                <tr>
-                                    <th className="px-4 py-2 text-left text-gray-300">Data</th>
-                                    <th className="px-4 py-2 text-left text-gray-300">Lucrări</th>
-                                    <th className="px-4 py-2 text-left text-gray-300">Piese</th>
-                                    <th className="px-4 py-2 text-left text-gray-300">Cost</th>
-                                    <th className="px-4 py-2 text-left text-gray-300">Mecanic</th>
-                                    <th className="px-4 py-2 text-left text-gray-300">Status</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {history.map((h) => (
-                                    <tr key={h._id}>
-                                        <td className="px-4 py-2 text-white">{h.createdAt ? new Date(h.createdAt).toLocaleDateString() : '-'}</td>
-                                        <td className="px-4 py-2 text-gray-300">{h.worksPerformed || '-'}</td>
-                                        <td className="px-4 py-2 text-gray-300">{h.partsUsed?.map(p => p.name).join(', ') || '-'}</td>
-                                        <td className="px-4 py-2 text-gray-300">{h.totalCost} RON</td>
-                                        <td className="px-4 py-2 text-gray-300">{h.mechanic?.name || '-'}</td>
-                                        <td className="px-4 py-2 text-gray-300">{h.status || '-'}</td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                        </div>
-                        </>
                     )}
                     <button className="mt-4 w-full sm:w-auto px-4 py-2.5 rounded bg-gray-700 text-white" onClick={() => setShowHistory(false)}>Închide</button>
                 </div>

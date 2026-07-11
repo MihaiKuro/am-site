@@ -3,38 +3,59 @@ import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
 import axios from '../lib/axios';
 import { useUserStore } from "../stores/useUserStore";
+import { useOrderStore } from "../stores/useOrderStore";
 import LoadingSpinner from "../components/LoadingSpinner";
-import { Package, ShoppingBag } from 'lucide-react';
+import { ShoppingBag } from 'lucide-react';
 import { getDeliveryMethodLabel, getPaymentMethodLabel, getOrderStatusLabel, getOrderStatusClass } from '../lib/orderLabels';
 
 const ProfileOrdersPage = () => {
     const { user } = useUserStore();
+    const { cancelMyOrder } = useOrderStore();
     const [orders, setOrders] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [cancellingId, setCancellingId] = useState(null);
+
+    const fetchOrders = async () => {
+        if (!user) {
+            setLoading(false);
+            setError("User not logged in.");
+            return;
+        }
+        setLoading(true);
+        setError(null);
+        try {
+            const response = await axios.get('/orders/myorders');
+            setOrders(response.data.orders || []);
+        } catch (err) {
+            setError(err.response?.data?.message || "Failed to fetch orders.");
+            toast.error(err.response?.data?.message || "Failed to fetch orders.");
+        } finally {
+            setLoading(false);
+        }
+    };
 
     useEffect(() => {
-        const fetchOrders = async () => {
-            if (!user) {
-                setLoading(false);
-                setError("User not logged in.");
-                return;
-            }
-            setLoading(true);
-            setError(null);
-            try {
-                const response = await axios.get('/orders/myorders');
-                setOrders(response.data.orders || []);
-            } catch (err) {
-                setError(err.response?.data?.message || "Failed to fetch orders.");
-                toast.error(err.response?.data?.message || "Failed to fetch orders.");
-            } finally {
-                setLoading(false);
-            }
-        };
-
         fetchOrders();
     }, [user]);
+
+    const handleCancelOrder = async (orderId) => {
+        if (!window.confirm("Sigur vrei să anulezi această comandă?")) return;
+
+        setCancellingId(orderId);
+        try {
+            const result = await cancelMyOrder(orderId);
+            if (result?.order) {
+                setOrders((prev) => prev.map((order) => (order._id === orderId ? result.order : order)));
+            }
+        } catch {
+            // toast handled in store
+        } finally {
+            setCancellingId(null);
+        }
+    };
+
+    const canCancelOrder = (order) => order.status === "Pending";
 
     if (loading) {
         return <LoadingSpinner />;
@@ -74,9 +95,21 @@ const ProfileOrdersPage = () => {
                                             Plasată pe {order.createdAt ? new Date(order.createdAt).toLocaleDateString() : 'N/A'}
                                         </p>
                                     </div>
-                                    <span className={`px-3 py-1 rounded-full text-sm font-medium ${getOrderStatusClass(order.status)}`}>
-                                        {getOrderStatusLabel(order.status, order.deliveryMethod)}
-                                    </span>
+                                    <div className="flex flex-col sm:items-end gap-2">
+                                        <span className={`px-3 py-1 rounded-full text-sm font-medium ${getOrderStatusClass(order.status)}`}>
+                                            {getOrderStatusLabel(order.status, order.deliveryMethod)}
+                                        </span>
+                                        {canCancelOrder(order) && (
+                                            <button
+                                                type="button"
+                                                onClick={() => handleCancelOrder(order._id)}
+                                                disabled={cancellingId === order._id}
+                                                className="text-sm px-3 py-1.5 rounded-lg border border-red-700 text-red-300 hover:bg-red-900/30 disabled:opacity-50"
+                                            >
+                                                {cancellingId === order._id ? "Se anulează..." : "Anulează comanda"}
+                                            </button>
+                                        )}
+                                    </div>
                                 </div>
                                 
                                 <div className="space-y-4">

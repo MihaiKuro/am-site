@@ -5,14 +5,189 @@ import Category from "../models/category.model.js";
 import mongoose from "mongoose";
 import ServiceOrder from "../models/serviceOrder.model.js";
 
+const buildDateFilter = (period, startDate, endDate) => {
+	if (startDate && endDate) {
+		return {
+			createdAt: {
+				$gte: new Date(startDate),
+				$lte: new Date(endDate),
+			},
+		};
+	}
+
+	const daysAgo = new Date();
+	daysAgo.setDate(daysAgo.getDate() - parseInt(period, 10));
+	return { createdAt: { $gte: daysAgo } };
+};
+
+const productMarginExpr = (priceField, basePriceField) => ({
+	$subtract: [priceField, { $ifNull: [basePriceField, 0] }],
+});
+
+const mergeProductSalesReports = (orderReport, serviceReport) => {
+	const byProduct = new Map();
+
+	for (const row of [...orderReport, ...serviceReport]) {
+		const id = row._id.toString();
+		if (!byProduct.has(id)) {
+			byProduct.set(id, { ...row });
+			continue;
+		}
+
+		const existing = byProduct.get(id);
+		existing.totalQuantity += row.totalQuantity;
+		existing.orderCount += row.orderCount;
+		existing.totalRevenue += row.totalRevenue;
+		existing.averageOrderValue =
+			existing.orderCount > 0 ? existing.totalRevenue / existing.orderCount : 0;
+	}
+
+	return Array.from(byProduct.values()).sort((a, b) => b.totalQuantity - a.totalQuantity);
+};
+
+const aggregateServiceProductSales = async (dateFilter, categoryId, subcategoryId) => {
+	const pipeline = [
+		{
+			$match: {
+				...dateFilter,
+				status: "Finalizată",
+			},
+		},
+		{ $unwind: "$partsUsed" },
+		{
+			$match: {
+				"partsUsed.product": { $exists: true, $ne: null },
+			},
+		},
+		{
+			$group: {
+				_id: "$partsUsed.product",
+				totalQuantity: { $sum: "$partsUsed.quantity" },
+				orderCount: { $sum: 1 },
+			},
+		},
+		{
+			$lookup: {
+				from: "products",
+				localField: "_id",
+				foreignField: "_id",
+				as: "product",
+			},
+		},
+		{ $unwind: "$product" },
+	];
+
+	if (categoryId) {
+		pipeline.push({
+			$match: { "product.category": new mongoose.Types.ObjectId(categoryId) },
+		});
+	}
+	if (subcategoryId) {
+		pipeline.push({
+			$match: { "product.subcategory": new mongoose.Types.ObjectId(subcategoryId) },
+		});
+	}
+
+	pipeline.push(
+		{
+			$lookup: {
+				from: "categories",
+				localField: "product.category",
+				foreignField: "_id",
+				as: "category",
+			},
+		},
+		{ $unwind: "$category" },
+		{
+			$project: {
+				_id: 1,
+				productName: "$product.name",
+				productPrice: "$product.price",
+				basePrice: "$product.basePrice",
+				categoryName: "$category.name",
+				categoryId: "$category._id",
+				totalQuantity: 1,
+				orderCount: 1,
+				totalRevenue: {
+					$multiply: [
+						"$totalQuantity",
+						productMarginExpr("$product.price", "$product.basePrice"),
+					],
+				},
+				averageOrderValue: {
+					$cond: [
+						{ $eq: ["$orderCount", 0] },
+						0,
+						{
+							$divide: [
+								{
+									$multiply: [
+										"$totalQuantity",
+										productMarginExpr("$product.price", "$product.basePrice"),
+									],
+								},
+								"$orderCount",
+							],
+						},
+					],
+				},
+			},
+		}
+	);
+
+	return ServiceOrder.aggregate(pipeline);
+};
+
+const aggregateServicePartsSummary = async (dateFilter) => {
+	const result = await ServiceOrder.aggregate([
+		{
+			$match: {
+				...dateFilter,
+				status: "Finalizată",
+			},
+		},
+		{ $unwind: "$partsUsed" },
+		{
+			$match: {
+				"partsUsed.product": { $exists: true, $ne: null },
+			},
+		},
+		{
+			$lookup: {
+				from: "products",
+				localField: "partsUsed.product",
+				foreignField: "_id",
+				as: "product",
+			},
+		},
+		{ $unwind: "$product" },
+		{
+			$group: {
+				_id: null,
+				totalRevenue: {
+					$sum: {
+						$multiply: [
+							"$partsUsed.quantity",
+							productMarginExpr("$partsUsed.price", "$product.basePrice"),
+						],
+					},
+				},
+				totalQuantity: { $sum: "$partsUsed.quantity" },
+				totalOrders: { $sum: 1 },
+			},
+		},
+	]);
+
+	return result[0] || { totalRevenue: 0, totalQuantity: 0, totalOrders: 0 };
+};
+
 export const getAnalyticsData = async () => {
 	const totalUsers = await User.countDocuments();
 	const totalProducts = await Product.countDocuments();
 
-	// Only count Delivered or Shipped for sales/revenue
 	const salesData = await Order.aggregate([
 		{
-			$match: { isPaid: true }
+			$match: { isPaid: true },
 		},
 		{
 			$group: {
@@ -23,23 +198,35 @@ export const getAnalyticsData = async () => {
 		},
 	]);
 
-	const { totalSales, totalRevenue } = salesData[0] || { totalSales: 0, totalRevenue: 0 };
+	const serviceData = await ServiceOrder.aggregate([
+		{
+			$match: { status: "Finalizată" },
+		},
+		{
+			$group: {
+				_id: null,
+				totalSales: { $sum: 1 },
+				totalRevenue: { $sum: "$totalCost" },
+			},
+		},
+	]);
 
-	// Count cancelled orders
+	const orderStats = salesData[0] || { totalSales: 0, totalRevenue: 0 };
+	const serviceStats = serviceData[0] || { totalSales: 0, totalRevenue: 0 };
+
 	const cancelledCount = await Order.countDocuments({ status: "Cancelled" });
 
 	return {
 		users: totalUsers,
 		products: totalProducts,
-		totalSales,
-		totalRevenue,
+		totalSales: orderStats.totalSales + serviceStats.totalSales,
+		totalRevenue: orderStats.totalRevenue + serviceStats.totalRevenue,
 		cancelledOrders: cancelledCount,
 	};
 };
 
 export const getDailySalesData = async (startDate, endDate) => {
 	try {
-		// Delivered/Shipped
 		const dailySalesData = await Order.aggregate([
 			{
 				$match: {
@@ -47,7 +234,7 @@ export const getDailySalesData = async (startDate, endDate) => {
 						$gte: startDate,
 						$lte: endDate,
 					},
-					status: { $in: ["Delivered", "Shipped"] }
+					status: { $in: ["Delivered", "Shipped"] },
 				},
 			},
 			{
@@ -60,7 +247,26 @@ export const getDailySalesData = async (startDate, endDate) => {
 			{ $sort: { _id: 1 } },
 		]);
 
-		// Cancelled
+		const dailyServiceData = await ServiceOrder.aggregate([
+			{
+				$match: {
+					createdAt: {
+						$gte: startDate,
+						$lte: endDate,
+					},
+					status: "Finalizată",
+				},
+			},
+			{
+				$group: {
+					_id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
+					sales: { $sum: 1 },
+					revenue: { $sum: "$totalCost" },
+				},
+			},
+			{ $sort: { _id: 1 } },
+		]);
+
 		const dailyCancelledData = await Order.aggregate([
 			{
 				$match: {
@@ -84,11 +290,12 @@ export const getDailySalesData = async (startDate, endDate) => {
 
 		return dateArray.map((date) => {
 			const foundData = dailySalesData.find((item) => item._id === date);
+			const foundService = dailyServiceData.find((item) => item._id === date);
 			const foundCancelled = dailyCancelledData.find((item) => item._id === date);
 			return {
 				date,
-				sales: foundData?.sales || 0,
-				revenue: foundData?.revenue || 0,
+				sales: (foundData?.sales || 0) + (foundService?.sales || 0),
+				revenue: (foundData?.revenue || 0) + (foundService?.revenue || 0),
 				cancelled: foundCancelled?.cancelled || 0,
 			};
 		});
@@ -121,182 +328,168 @@ export const getSalesReport = async (req, res) => {
 			endDate 
 		} = req.query;
 
-		// Construiește filtru pentru data
-		let dateFilter = {};
-		if (startDate && endDate) {
-			dateFilter = {
-				createdAt: {
-					$gte: new Date(startDate),
-					$lte: new Date(endDate)
-				}
-			};
-		} else {
-			// Folosește perioada în zile
-			const daysAgo = new Date();
-			daysAgo.setDate(daysAgo.getDate() - parseInt(period));
-			dateFilter = {
-				createdAt: { $gte: daysAgo }
-			};
-		}
+		const dateFilter = buildDateFilter(period, startDate, endDate);
 
-		// Construiește pipeline pentru agregare
 		const pipeline = [
-			// Filtrează comenzile după dată și status (doar comenzile finalizate)
 			{
 				$match: {
 					...dateFilter,
-					status: { $in: ["Delivered", "Shipped"] }
-				}
+					status: { $in: ["Delivered", "Shipped"] },
+				},
 			},
-			// Dezarhivează orderItems
 			{
-				$unwind: "$orderItems"
+				$unwind: "$orderItems",
 			},
-			// Grupează după produs
 			{
 				$group: {
 					_id: "$orderItems.product",
 					totalQuantity: { $sum: "$orderItems.quantity" },
 					totalRevenue: { $sum: { $multiply: ["$orderItems.quantity", { $subtract: ["$orderItems.price", "$product.basePrice"] }] } },
-					orderCount: { $sum: 1 }
-				}
+					orderCount: { $sum: 1 },
+				},
 			},
-			// Sortează după cantitate descrescător
 			{
-				$sort: { totalQuantity: -1 }
+				$sort: { totalQuantity: -1 },
 			},
-			// Limitează rezultatele
-			{
-				$limit: parseInt(limit)
-			},
-			// Populează informațiile despre produs
 			{
 				$lookup: {
 					from: "products",
 					localField: "_id",
 					foreignField: "_id",
-					as: "product"
-				}
+					as: "product",
+				},
 			},
 			{
-				$unwind: "$product"
+				$unwind: "$product",
 			},
-			// Populează informațiile despre categorie
 			{
 				$lookup: {
 					from: "categories",
 					localField: "product.category",
 					foreignField: "_id",
-					as: "category"
-				}
+					as: "category",
+				},
 			},
 			{
-				$unwind: "$category"
+				$unwind: "$category",
 			},
-			// Proiectează rezultatul final
-			{
-				$project: {
-					_id: 1,
-					productName: "$product.name",
-					productPrice: "$product.price",
-					basePrice: "$product.basePrice",
-					categoryName: "$category.name",
-					categoryId: "$category._id",
-					totalQuantity: 1,
-					totalRevenue: {
-						$multiply: [
-							"$totalQuantity",
-							{ $subtract: ["$product.price", "$product.basePrice"] }
-						]
-					},
-					orderCount: 1,
-					averageOrderValue: {
-						$cond: [
-							{ $eq: ["$orderCount", 0] },
-							0,
-							{ $divide: [
-								{ $multiply: ["$totalQuantity", { $subtract: ["$product.price", "$product.basePrice"] }] },
-								"$orderCount"
-							] }
-						]
-					}
-				}
-			}
 		];
 
-		// 1. $match pe dată și status la început
-		pipeline.unshift({
-			$match: {
-				...dateFilter,
-				status: { $in: ["Delivered", "Shipped"] }
-			}
-		});
-		// 2. După $unwind: "$product", filtrează produsele în stoc și aplică filtru pe categorie/subcategorie dacă e cazul
-		const unwindProductIndex = pipeline.findIndex(
-			stage => stage.$unwind && stage.$unwind === "$product"
-		);
-		if (unwindProductIndex !== -1) {
-			const matchObj = {
-				"product.stock": { $gt: 0 }
-			};
-			if (categoryId) matchObj["product.category"] = new mongoose.Types.ObjectId(categoryId);
-			if (subcategoryId) matchObj["product.subcategory"] = new mongoose.Types.ObjectId(subcategoryId);
-			pipeline.splice(unwindProductIndex + 1, 0, { $match: matchObj });
+		if (categoryId) {
+			pipeline.push({
+				$match: { "product.category": new mongoose.Types.ObjectId(categoryId) },
+			});
+		}
+		if (subcategoryId) {
+			pipeline.push({
+				$match: { "product.subcategory": new mongoose.Types.ObjectId(subcategoryId) },
+			});
 		}
 
-		const salesReport = await Order.aggregate(pipeline);
+		pipeline.push({
+			$project: {
+				_id: 1,
+				productName: "$product.name",
+				productPrice: "$product.price",
+				basePrice: "$product.basePrice",
+				categoryName: "$category.name",
+				categoryId: "$category._id",
+				totalQuantity: 1,
+				totalRevenue: {
+					$multiply: [
+						"$totalQuantity",
+						productMarginExpr("$product.price", "$product.basePrice"),
+					],
+				},
+				orderCount: 1,
+				averageOrderValue: {
+					$cond: [
+						{ $eq: ["$orderCount", 0] },
+						0,
+						{
+							$divide: [
+								{
+									$multiply: [
+										"$totalQuantity",
+										productMarginExpr("$product.price", "$product.basePrice"),
+									],
+								},
+								"$orderCount",
+							],
+						},
+					],
+				},
+			},
+		});
 
-		// Calculează statistici generale
-		const totalStats = await Order.aggregate([
+		const [orderSalesReport, serviceSalesReport] = await Promise.all([
+			Order.aggregate(pipeline),
+			aggregateServiceProductSales(dateFilter, categoryId, subcategoryId),
+		]);
+
+		const salesReport = mergeProductSalesReports(orderSalesReport, serviceSalesReport).slice(
+			0,
+			parseInt(limit, 10)
+		);
+
+		const orderSummary = await Order.aggregate([
 			{
-				$match: dateFilter
+				$match: {
+					...dateFilter,
+					status: { $in: ["Delivered", "Shipped"] },
+				},
 			},
 			{
-				$unwind: "$orderItems"
+				$unwind: "$orderItems",
 			},
 			{
 				$lookup: {
 					from: "products",
 					localField: "orderItems.product",
 					foreignField: "_id",
-					as: "product"
-				}
+					as: "product",
+				},
 			},
 			{
-				$unwind: "$product"
-			},
-			{
-				$match: {
-					"product.stock": { $gt: 0 }
-				}
+				$unwind: "$product",
 			},
 			{
 				$group: {
 					_id: null,
-					totalRevenue: { $sum: { $multiply: ["$orderItems.quantity", { $subtract: ["$orderItems.price", "$product.basePrice"] }] } },
+					totalRevenue: {
+						$sum: {
+							$multiply: [
+								"$orderItems.quantity",
+								productMarginExpr("$orderItems.price", "$product.basePrice"),
+							],
+						},
+					},
 					totalQuantity: { $sum: "$orderItems.quantity" },
-					totalOrders: { $sum: 1 }
-				}
-			}
+					totalOrders: { $sum: 1 },
+				},
+			},
 		]);
+
+		const serviceSummary = await aggregateServicePartsSummary(dateFilter);
+		const orderStats = orderSummary[0] || { totalRevenue: 0, totalQuantity: 0, totalOrders: 0 };
 
 		res.json({
 			success: true,
 			data: {
 				salesReport,
-				summary: totalStats[0] || {
-					totalRevenue: 0,
-					totalQuantity: 0,
-					totalOrders: 0
+				summary: {
+					totalRevenue: orderStats.totalRevenue + serviceSummary.totalRevenue,
+					totalQuantity: orderStats.totalQuantity + serviceSummary.totalQuantity,
+					totalOrders: orderStats.totalOrders + serviceSummary.totalOrders,
 				},
 				filters: {
-					period: parseInt(period),
+					period: parseInt(period, 10),
 					categoryId,
 					subcategoryId,
 					startDate,
-					endDate
-				}
-			}
+					endDate,
+				},
+			},
 		});
 
 	} catch (error) {
@@ -304,7 +497,7 @@ export const getSalesReport = async (req, res) => {
 		res.status(500).json({
 			success: false,
 			message: "Eroare la generarea raportului de vânzări",
-			error: error.message
+			error: error.message,
 		});
 	}
 };

@@ -4,6 +4,7 @@ import {
   createServiceOrder,
   getAllServiceOrders,
   getServiceOrderById,
+  getServiceOrderByAppointmentId,
   updateServiceOrder,
   addPartToOrder,
   addLaborToOrder,
@@ -25,6 +26,8 @@ router.get("/", getAllServiceOrders);
 router.get("/history", protectRoute, getServiceHistory);
 
 router.post("/from-appointment/:id", protectRoute, adminRoute, completeAppointmentServiceOrder);
+
+router.get("/by-appointment/:appointmentId", protectRoute, adminRoute, getServiceOrderByAppointmentId);
 
 // Detalii fișă
 router.get("/:id", getServiceOrderById);

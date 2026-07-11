@@ -1,6 +1,8 @@
 import { Fragment, useEffect, useState } from "react";
 import axios from "../lib/axios";
 import toast from "react-hot-toast";
+import ServiceCompletionForm from "./ServiceCompletionForm";
+import ServiceOrderSummary from "./ServiceOrderSummary";
 
 const STATUS_OPTIONS = ["În așteptare", "Confirmată", "Finalizată", "Anulată"];
 
@@ -50,26 +52,32 @@ export default function AppointmentsList() {
 	const [completionOpenId, setCompletionOpenId] = useState(null);
 	const [completionDrafts, setCompletionDrafts] = useState({});
 	const [completionSavingId, setCompletionSavingId] = useState(null);
-
-	const updateDraft = (id, field, value) => {
-		setCompletionDrafts((prev) => ({
-			...prev,
-			[id]: { ...(prev[id] || {}), [field]: value },
-		}));
-	};
+	const [serviceDetailOpenId, setServiceDetailOpenId] = useState(null);
+	const [serviceDetail, setServiceDetail] = useState(null);
+	const [serviceDetailLoading, setServiceDetailLoading] = useState(false);
 
 	const handleCompleteAppointment = async (id) => {
 		const draft = completionDrafts[id] || {};
-		if (!draft.worksPerformed?.trim() && !draft.partsUsed?.trim() && (draft.laborHours === undefined || draft.laborHours === null || draft.laborHours === "")) {
-			return toast.error("Completează cel puțin lucrările efectuate, piese folosite sau ore de lucru.");
+		const hasPayload =
+			draft.worksPerformed?.trim() ||
+			(draft.catalogParts?.length > 0) ||
+			(draft.laborHours !== undefined && draft.laborHours !== null && draft.laborHours !== "") ||
+			(draft.laborCost !== undefined && draft.laborCost !== null && draft.laborCost !== "");
+
+		if (!hasPayload) {
+			return toast.error("Completează lucrările, piese din catalog sau costul manoperei.");
 		}
 
 		setCompletionSavingId(id);
 		try {
 			const res = await axios.post(`/service-orders/from-appointment/${id}`, {
 				worksPerformed: draft.worksPerformed || "",
-				partsUsed: draft.partsUsed || "",
+				catalogParts: (draft.catalogParts || []).map((part) => ({
+					productId: part.productId,
+					quantity: part.quantity,
+				})),
 				laborHours: draft.laborHours || "",
+				laborCost: draft.laborCost || "",
 				notes: draft.notes || "",
 			});
 
@@ -86,62 +94,18 @@ export default function AppointmentsList() {
 
 	const renderCompletionForm = (appt) => {
 		if (completionOpenId !== appt._id) return null;
-		const draft = completionDrafts[appt._id] || {};
 		if (appt.status === "Finalizată" || appt.status === "Anulată") return null;
 
 		return (
-			<div className="mt-3 rounded-lg border border-blue-700/40 bg-slate-950 p-3">
-				<div className="mb-3 text-sm font-semibold text-blue-200">Detalii service</div>
-				<label className="block mb-3 text-sm text-slate-200">
-					Lucrări efectuate
-					<textarea
-						className="mt-1 w-full rounded-md border border-slate-700 bg-slate-900 p-2 text-white"
-						rows="3"
-						value={draft.worksPerformed || ""}
-						onChange={(e) => updateDraft(appt._id, "worksPerformed", e.target.value)}
-						placeholder="Ex: schimbat filtru ulei, verificat frâne"
-					/>
-				</label>
-				<label className="block mb-3 text-sm text-slate-200">
-					Piese folosite
-					<input
-						className="mt-1 w-full rounded-md border border-slate-700 bg-slate-900 p-2 text-white"
-						value={draft.partsUsed || ""}
-						onChange={(e) => updateDraft(appt._id, "partsUsed", e.target.value)}
-						placeholder="Ex: filtru ulei, bujie"
-					/>
-				</label>
-				<label className="block mb-3 text-sm text-slate-200">
-					Ore de lucru
-					<input
-						type="number"
-						min="0"
-						step="0.5"
-						className="mt-1 w-full rounded-md border border-slate-700 bg-slate-900 p-2 text-white"
-						value={draft.laborHours || ""}
-						onChange={(e) => updateDraft(appt._id, "laborHours", e.target.value)}
-						placeholder="0"
-					/>
-				</label>
-				<label className="block mb-3 text-sm text-slate-200">
-					Notă
-					<textarea
-						className="mt-1 w-full rounded-md border border-slate-700 bg-slate-900 p-2 text-white"
-						rows="2"
-						value={draft.notes || ""}
-						onChange={(e) => updateDraft(appt._id, "notes", e.target.value)}
-						placeholder="Observații"
-					/>
-				</label>
-				<button
-					type="button"
-					className="rounded-lg bg-[#2B4EE6] px-4 py-2 text-sm text-white hover:bg-[#1f3bbe]"
-					onClick={() => handleCompleteAppointment(appt._id)}
-					disabled={completionSavingId === appt._id}
-				>
-					{completionSavingId === appt._id ? "Se salvează..." : "Marchează ca finalizată"}
-				</button>
-			</div>
+			<ServiceCompletionForm
+				appointmentId={appt._id}
+				draft={completionDrafts[appt._id] || {}}
+				onDraftChange={(nextDraft) =>
+					setCompletionDrafts((prev) => ({ ...prev, [appt._id]: nextDraft }))
+				}
+				onSubmit={handleCompleteAppointment}
+				saving={completionSavingId === appt._id}
+			/>
 		);
 	};
 
@@ -221,6 +185,26 @@ export default function AppointmentsList() {
 		}
 	};
 
+	const handleViewServiceOrder = async (id) => {
+		setServiceDetailOpenId(id);
+		setServiceDetail(null);
+		setServiceDetailLoading(true);
+		try {
+			const res = await axios.get(`/service-orders/by-appointment/${id}`);
+			setServiceDetail(res.data.order);
+		} catch (e) {
+			toast.error(e.response?.data?.message || "Fișa de service nu a fost găsită");
+			setServiceDetailOpenId(null);
+		} finally {
+			setServiceDetailLoading(false);
+		}
+	};
+
+	const closeServiceDetail = () => {
+		setServiceDetailOpenId(null);
+		setServiceDetail(null);
+	};
+
 	const renderActions = (appt) => (
 		<div className="flex flex-wrap gap-2">
 			{appt.status !== "Confirmată" && appt.status !== "Anulată" && appt.status !== "Finalizată" && (
@@ -239,7 +223,15 @@ export default function AppointmentsList() {
 					{completionOpenId === appt._id ? "Ascunde" : "Completează"}
 				</button>
 			)}
-			{appt.status !== "Anulată" && (
+			{appt.status === "Finalizată" && (
+				<button
+					className="bg-gray-600 hover:bg-gray-700 text-white px-3 py-1.5 rounded-lg text-sm"
+					onClick={() => handleViewServiceOrder(appt._id)}
+				>
+					Vezi fișa
+				</button>
+			)}
+			{(appt.status === "În așteptare" || appt.status === "Confirmată") && (
 				<button
 					className="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg text-sm"
 					onClick={() => handleCancel(appt._id)}
@@ -400,6 +392,34 @@ export default function AppointmentsList() {
 						</table>
 					</div>
 				</>
+			)}
+
+			{serviceDetailOpenId && (
+				<div
+					className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60"
+					onClick={closeServiceDetail}
+				>
+					<div
+						className="bg-gray-900 border border-gray-700 rounded-lg w-full max-w-lg max-h-[90vh] overflow-y-auto p-4 sm:p-6"
+						onClick={(e) => e.stopPropagation()}
+					>
+						<div className="flex items-center justify-between mb-4">
+							<h3 className="text-lg font-semibold text-white">Fișă service</h3>
+							<button
+								type="button"
+								onClick={closeServiceDetail}
+								className="text-gray-400 hover:text-white text-sm"
+							>
+								Închide
+							</button>
+						</div>
+						{serviceDetailLoading ? (
+							<p className="text-gray-400 text-sm text-center py-8">Se încarcă fișa...</p>
+						) : serviceDetail ? (
+							<ServiceOrderSummary entry={serviceDetail} className="bg-gray-800/50" />
+						) : null}
+					</div>
+				</div>
 			)}
 		</div>
 	);

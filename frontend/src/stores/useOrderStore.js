@@ -79,4 +79,23 @@ export const useOrderStore = create((set) => ({
 			toast.error(errorMessage);
 		}
 	},
+
+	cancelMyOrder: async (orderId) => {
+		try {
+			const response = await axios.put(`/orders/${orderId}/cancel`);
+			if (response.data.success) {
+				set((state) => ({
+					orders: state.orders.map((order) =>
+						order._id === orderId ? response.data.order : order
+					),
+				}));
+				toast.success(response.data.message || "Comanda a fost anulată");
+			}
+			return response.data;
+		} catch (error) {
+			const errorMessage = error.response?.data?.message || "Nu s-a putut anula comanda";
+			toast.error(errorMessage);
+			throw error;
+		}
+	},
 })); 

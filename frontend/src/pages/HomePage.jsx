@@ -4,6 +4,7 @@ import { useProductStore } from "../stores/useProductStore";
 import { useCategoryStore } from "../stores/useCategoryStore";
 import FeaturedProducts from "../components/FeaturedProducts";
 import ServiceAppointment from "../components/ServiceAppointment";
+import HeroSection from "../components/HeroSection";
 
 const HomePage = () => {
 	const { fetchFeaturedProducts, products, loading } = useProductStore();
@@ -19,93 +20,67 @@ const HomePage = () => {
 
 	return (
 		<div className='relative min-h-screen text-white overflow-x-hidden'>
-			{/* Hero Section */}
-			<div className='bg-[#2B4EE6] py-10 sm:py-16'>
-				<div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'>
-					<div className='grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8 items-center'>
-						<div className='space-y-4 sm:space-y-6'>
-							<h1 className='text-3xl sm:text-5xl lg:text-6xl font-bold text-white leading-tight'>
-								Piese auto de calitate
-							</h1>
-							<h2 className='text-xl sm:text-3xl lg:text-4xl font-bold text-yellow-400 leading-snug'>
-								Pentru orice vehicul
-							</h2>
-							<p className='text-base sm:text-lg text-gray-200 max-w-lg'>
-								Găsește piesele perfecte pentru mașina ta din colecția noastră extinsă de componente OEM și aftermarket.
-							</p>
-							<div className='flex flex-col sm:flex-row gap-3 sm:gap-4'>
-								<Link
-									to="/categories"
-									className='inline-flex items-center justify-center px-6 py-3 bg-yellow-500 hover:bg-yellow-400 text-gray-900 font-semibold rounded-lg transition duration-300'
-								>
-									Cumpără acum
-									<svg className='ml-2 w-5 h-5 shrink-0' viewBox='0 0 20 20' fill='currentColor'>
-										<path fillRule='evenodd' d='M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z' clipRule='evenodd' />
-									</svg>
-								</Link>
-								<button
-									className='inline-flex items-center justify-center px-6 py-3 bg-transparent hover:bg-blue-700 text-white font-semibold rounded-lg border-2 border-white transition duration-300 text-sm sm:text-base'
-								>
-									Caută piese după vehicul
-								</button>
-							</div>
-						</div>
-						<div className='hidden md:block'>
-							<img
-								src="/auto-parts-collection.jpg"
-								alt="Auto parts collection"
-								className='w-full h-auto rounded-lg shadow-xl'
-							/>
-						</div>
-					</div>
-				</div>
-			</div>
+			<HeroSection />
 
 			{/* Featured Categories Section */}
-			<div className='bg-[#0B0F17] py-10 sm:py-16'>
-				<div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'>
-					<div className='text-center mb-8 sm:mb-12'>
-						<h2 className='text-2xl sm:text-3xl font-bold text-white mb-3 sm:mb-4'>Cumpără după categorie</h2>
-						<p className='text-sm sm:text-base text-gray-400 max-w-2xl mx-auto px-2'>
+			<section className="relative border-t border-[#2A3548] bg-[#0B0F17] py-14 sm:py-20">
+				<div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+					<div className="mb-8 sm:mb-12 max-w-2xl">
+						<p className="text-[10px] uppercase tracking-[0.2em] text-[#6B7A94] mb-3">
+							Explorează catalogul
+						</p>
+						<h2 className="font-hero text-2xl sm:text-3xl lg:text-4xl font-bold text-white mb-3">
+							Cumpără după categorie
+						</h2>
+						<p className="text-sm sm:text-base text-[#9CA8BC] leading-relaxed">
 							Explorează colecția noastră extinsă de piese auto organizate pe categorii pentru a găsi exact ceea ce ai nevoie
 						</p>
 					</div>
 
-					<div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6'>
+					<div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
 						{featuredCategories.map((category) => (
 							<Link
 								key={category._id}
 								to={`/category/${category.slug}`}
-								className='group relative overflow-hidden rounded-lg bg-gray-800 hover:bg-gray-700 transition-all duration-300 aspect-video min-h-[160px]'
+								className="group flex flex-col overflow-hidden rounded-xl border border-[#2A3548] bg-[#111827] transition-colors hover:border-[#2B4EE6]/50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2B4EE6]"
 							>
-								<img
-									src={category.image}
-									alt={category.name}
-									className='absolute inset-0 w-full h-full object-cover transition-transform duration-300 group-hover:scale-105'
-								/>
-								<div className='absolute inset-0 bg-gradient-to-t from-black/80 to-transparent'></div>
-								<div className='absolute bottom-0 left-0 right-0 p-3 sm:p-4'>
-									<h3 className='text-lg sm:text-xl font-semibold text-white mb-0.5 sm:mb-1'>{category.name}</h3>
-									<p className='text-xs sm:text-sm text-gray-300'>Vezi {category.name}</p>
+								<div className="relative h-20 sm:h-24 overflow-hidden bg-[#0B0F17]">
+									<img
+										src={category.image}
+										alt=""
+										className="h-full w-full object-cover object-center transition-transform duration-300 group-hover:scale-105 motion-reduce:transition-none"
+									/>
+								</div>
+								<div className="bg-[#111827] px-2.5 sm:px-3 py-2 sm:py-2.5 border-t border-[#2A3548]">
+									<h3 className="font-hero text-sm sm:text-base font-bold text-white leading-tight line-clamp-2">
+										{category.name}
+									</h3>
+									<p className="mt-0.5 text-[11px] sm:text-xs font-semibold text-[#F5A623] group-hover:text-[#FFBE4D] transition-colors">
+										Vezi categoria →
+									</p>
 								</div>
 							</Link>
 						))}
 					</div>
 
-					<div className='text-center mt-8'>
+					<div className="text-center mt-10">
 						<Link
 							to="/categories"
-							className='inline-flex items-center px-6 py-3 bg-[#2B4EE6] hover:bg-blue-500 text-white font-semibold rounded-lg transition duration-300'
+							className="inline-flex items-center justify-center rounded-lg border border-[#3D4F6F] bg-[#141B28]/80 px-6 py-3 text-sm sm:text-base font-semibold text-white transition-colors hover:border-[#2B4EE6] hover:bg-[#1A2332] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2B4EE6]"
 						>
 							Vezi toate categoriile
 						</Link>
 					</div>
 				</div>
-			</div>
+			</section>
 
 			{/* Featured Products Section */}
 			{!loading && products.length > 0 && <FeaturedProducts featuredProducts={products} />}
-			{!loading && <ServiceAppointment />}
+			{!loading && (
+				<section className="border-t border-[#2A3548] bg-[#0B0F17] pb-14 sm:pb-20">
+					<ServiceAppointment />
+				</section>
+			)}
 		</div>
 	);
 };

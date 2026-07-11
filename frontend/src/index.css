@@ -46,4 +46,8 @@
 	.safe-area-top {
 		padding-top: env(safe-area-inset-top, 0px);
 	}
+
+	.font-hero {
+		font-family: "Syne", system-ui, sans-serif;
+	}
 }

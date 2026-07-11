@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 
 const partUsedSchema = new mongoose.Schema({
+  product: { type: mongoose.Schema.Types.ObjectId, ref: "Product" },
   name: { type: String, required: true },
   partNumber: { type: String },
   quantity: { type: Number, required: true, min: 1 },

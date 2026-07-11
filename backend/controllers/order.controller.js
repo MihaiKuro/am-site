@@ -2,6 +2,14 @@ import Order from "../models/order.model.js";
 import Product from "../models/product.model.js";
 import User from "../models/user.model.js";
 import { updateFeaturedProductsCache } from "./product.controller.js";
+import { stripe } from "../lib/stripe.js";
+
+const restoreOrderStock = async (orderItems) => {
+    for (const item of orderItems) {
+        await Product.findByIdAndUpdate(item.product, { $inc: { stock: item.quantity } });
+    }
+    await updateFeaturedProductsCache();
+};
 
 export const createOrder = async (req, res) => {
     try {
@@ -178,5 +186,54 @@ export const deleteOrder = async (req, res) => {
     } catch (error) {
         console.error("Error deleting order:", error);
         res.status(500).json({ message: "Error deleting order", error: error.message });
+    }
+};
+
+export const cancelMyOrder = async (req, res) => {
+    try {
+        const order = await Order.findById(req.params.id);
+        if (!order) {
+            return res.status(404).json({ success: false, message: "Comanda nu a fost găsită" });
+        }
+
+        if (order.user.toString() !== req.user._id.toString()) {
+            return res.status(403).json({ success: false, message: "Nu ai permisiunea să anulezi această comandă" });
+        }
+
+        if (order.status === "Cancelled") {
+            return res.status(400).json({ success: false, message: "Comanda este deja anulată" });
+        }
+
+        if (order.status !== "Pending") {
+            return res.status(400).json({
+                success: false,
+                message: "Doar comenzile în așteptare pot fi anulate",
+            });
+        }
+
+        if (order.isPaid && order.paymentMethod === "card" && order.stripeSessionId && stripe) {
+            const session = await stripe.checkout.sessions.retrieve(order.stripeSessionId);
+            const paymentIntentId =
+                typeof session.payment_intent === "string"
+                    ? session.payment_intent
+                    : session.payment_intent?.id;
+
+            if (paymentIntentId) {
+                await stripe.refunds.create({ payment_intent: paymentIntentId });
+            }
+        }
+
+        await restoreOrderStock(order.orderItems);
+        order.status = "Cancelled";
+        await order.save();
+
+        res.json({ success: true, message: "Comanda a fost anulată", order });
+    } catch (error) {
+        console.error("Error cancelling order:", error);
+        res.status(500).json({
+            success: false,
+            message: "Eroare la anularea comenzii",
+            error: error.message,
+        });
     }
 };

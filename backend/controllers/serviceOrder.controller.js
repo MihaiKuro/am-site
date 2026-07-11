@@ -1,36 +1,80 @@
+import mongoose from "mongoose";
 import ServiceOrder from "../models/serviceOrder.model.js";
 import Appointment from "../models/appointment.model.js";
 import Vehicle from "../models/vehicle.model.js";
+import Product from "../models/product.model.js";
 import { resolveVehicleDetails, buildVehicleIdMatches } from "../lib/vehicleDetails.js";
+import { updateFeaturedProductsCache } from "./product.controller.js";
 
 const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-const parsePartsUsed = (partsUsed) => {
-  if (!partsUsed?.trim()) return [];
-
-  return partsUsed
-    .split(",")
-    .map((part) => part.trim())
-    .filter(Boolean)
-    .map((name) => ({
-      name,
-      quantity: 1,
-      price: 0,
-    }));
-};
-
-const parseLabor = (laborHours) => {
+const buildLaborEntry = (laborHours, laborCost) => {
+  const cost = Number(laborCost);
   const hours = Number(laborHours);
-  if (!hours || hours <= 0) return [];
 
-  return [
-    {
-      description: "Manoperă",
-      hours,
-      rate: 0,
-    },
-  ];
+  if (!cost || cost <= 0) return { labor: [], totalLabor: 0 };
+
+  if (hours && hours > 0) {
+    return {
+      labor: [{ description: "Manoperă", hours, rate: cost / hours }],
+      totalLabor: cost,
+    };
+  }
+
+  return {
+    labor: [{ description: "Manoperă", hours: 1, rate: cost }],
+    totalLabor: cost,
+  };
 };
+
+const resolveCatalogParts = async (catalogParts = []) => {
+  if (!Array.isArray(catalogParts) || catalogParts.length === 0) {
+    return { parts: [], totalParts: 0, stockUpdates: [] };
+  }
+
+  const parts = [];
+  const stockUpdates = [];
+  let totalParts = 0;
+
+  for (const item of catalogParts) {
+    const quantity = Number(item.quantity);
+    if (!item.productId || !mongoose.Types.ObjectId.isValid(item.productId)) {
+      throw new Error("Produs invalid selectat din catalog");
+    }
+    if (!quantity || quantity <= 0) {
+      throw new Error("Cantitatea pentru fiecare piesă trebuie să fie cel puțin 1");
+    }
+
+    const product = await Product.findById(item.productId);
+    if (!product) {
+      throw new Error("Un produs selectat nu mai există în catalog");
+    }
+    if (product.stock < quantity) {
+      throw new Error(`Stoc insuficient pentru ${product.name}. Disponibil: ${product.stock}`);
+    }
+
+    const lineTotal = product.price * quantity;
+    totalParts += lineTotal;
+    stockUpdates.push({ productId: product._id, quantity });
+
+    parts.push({
+      product: product._id,
+      name: product.name,
+      quantity,
+      price: product.price,
+    });
+  }
+
+  return { parts, totalParts, stockUpdates };
+};
+
+const hasCompletionPayload = ({ worksPerformed, catalogParts, laborHours, laborCost }) =>
+  Boolean(
+    worksPerformed?.trim() ||
+    (Array.isArray(catalogParts) && catalogParts.length > 0) ||
+    (laborHours !== undefined && laborHours !== null && laborHours !== "") ||
+    (laborCost !== undefined && laborCost !== null && laborCost !== "")
+  );
 
 // Creează fișă de service
 export const createServiceOrder = async (req, res) => {
@@ -58,6 +102,20 @@ export const getServiceOrderById = async (req, res) => {
   try {
     const order = await ServiceOrder.findById(req.params.id);
     if (!order) return res.status(404).json({ success: false, message: "Not found" });
+    res.json({ success: true, order });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Detalii fișă după programare
+export const getServiceOrderByAppointmentId = async (req, res) => {
+  try {
+    const order = await ServiceOrder.findOne({ appointment: req.params.appointmentId })
+      .populate("mechanic", "name");
+    if (!order) {
+      return res.status(404).json({ success: false, message: "Fișa de service nu a fost găsită" });
+    }
     res.json({ success: true, order });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -117,43 +175,43 @@ export const changeOrderStatus = async (req, res) => {
 };
 
 export const completeAppointmentServiceOrder = async (req, res) => {
+  const session = await mongoose.startSession();
+
   try {
-    const { worksPerformed, partsUsed, laborHours, notes } = req.body;
+    const { worksPerformed, catalogParts, laborHours, laborCost, notes } = req.body;
     const appointment = await Appointment.findById(req.params.id);
     if (!appointment) {
       return res.status(404).json({ success: false, message: "Programarea nu a fost găsită" });
     }
 
-    if (!worksPerformed?.trim() && !partsUsed?.trim() && (laborHours === undefined || laborHours === null || laborHours === "")) {
+    if (!hasCompletionPayload({ worksPerformed, catalogParts, laborHours, laborCost })) {
       return res.status(400).json({
         success: false,
-        message: "Completează cel puțin lucrările efectuate, piese folosite sau orele de lucru.",
+        message: "Completează lucrările efectuate, piese din catalog sau costul manoperei.",
       });
     }
 
     const vehicleDetails = await resolveVehicleDetails(appointment.vehicle);
-    const parsedParts = parsePartsUsed(partsUsed);
-    const parsedLabor = parseLabor(laborHours);
-    const totalParts = parsedParts.reduce((sum, part) => sum + part.price * part.quantity, 0);
-    const totalLabor = parsedLabor.reduce((sum, item) => sum + item.hours * item.rate, 0);
+    const { parts, totalParts, stockUpdates } = await resolveCatalogParts(catalogParts);
+    const { labor, totalLabor } = buildLaborEntry(laborHours, laborCost);
+    const totalCost = totalParts + totalLabor;
 
-    let serviceOrder = await ServiceOrder.findOne({ appointment: appointment._id });
+    let serviceOrder;
 
-    if (serviceOrder) {
-      serviceOrder.worksPerformed = worksPerformed?.trim() || serviceOrder.worksPerformed;
-      serviceOrder.partsUsed = parsedParts.length ? parsedParts : serviceOrder.partsUsed;
-      serviceOrder.labor = parsedLabor.length ? parsedLabor : serviceOrder.labor;
-      serviceOrder.totalParts = totalParts;
-      serviceOrder.totalLabor = totalLabor;
-      serviceOrder.totalCost = totalParts + totalLabor;
-      serviceOrder.notes = notes?.trim() || serviceOrder.notes;
-      serviceOrder.status = "Finalizată";
-      serviceOrder.licensePlate = vehicleDetails.licensePlate || serviceOrder.licensePlate;
-      serviceOrder.vin = vehicleDetails.vin || serviceOrder.vin;
-      serviceOrder.vehicle = vehicleDetails.label;
-      await serviceOrder.save();
-    } else {
-      serviceOrder = await ServiceOrder.create({
+    await session.withTransaction(async () => {
+      for (const update of stockUpdates) {
+        const updatedProduct = await Product.findOneAndUpdate(
+          { _id: update.productId, stock: { $gte: update.quantity } },
+          { $inc: { stock: -update.quantity } },
+          { new: true, session }
+        );
+
+        if (!updatedProduct) {
+          throw new Error("Stoc insuficient pentru una dintre piesele selectate");
+        }
+      }
+
+      const orderPayload = {
         user: appointment.user,
         vehicle: vehicleDetails.label,
         licensePlate: vehicleDetails.licensePlate,
@@ -161,31 +219,65 @@ export const completeAppointmentServiceOrder = async (req, res) => {
         appointment: appointment._id,
         mechanic: appointment.mechanic,
         status: "Finalizată",
-        statusHistory: [{ status: "Finalizată", note: notes?.trim() || "Programare finalizată" }],
         worksPerformed: worksPerformed?.trim() || "",
-        partsUsed: parsedParts,
-        labor: parsedLabor,
+        partsUsed: parts,
+        labor,
         totalParts,
         totalLabor,
-        totalCost: totalParts + totalLabor,
+        totalCost,
         notes: notes?.trim() || appointment.note || "",
-      });
+      };
+
+      const existingOrder = await ServiceOrder.findOne({ appointment: appointment._id }).session(session);
+
+      if (existingOrder) {
+        existingOrder.set({
+          ...orderPayload,
+          statusHistory: [
+            ...(existingOrder.statusHistory || []),
+            { status: "Finalizată", note: notes?.trim() || "Programare actualizată" },
+          ],
+        });
+        serviceOrder = await existingOrder.save({ session });
+      } else {
+        serviceOrder = await ServiceOrder.create(
+          [{
+            ...orderPayload,
+            statusHistory: [{ status: "Finalizată", note: notes?.trim() || "Programare finalizată" }],
+          }],
+          { session }
+        );
+        serviceOrder = serviceOrder[0];
+      }
+
+      appointment.status = "Finalizată";
+      appointment.note =
+        notes?.trim() ||
+        [
+          worksPerformed?.trim(),
+          parts.length ? `Piese: ${parts.map((part) => `${part.name} x${part.quantity}`).join(", ")}` : "",
+          totalLabor ? `Manoperă: ${totalLabor} RON` : "",
+          totalCost ? `Total: ${totalCost} RON` : "",
+        ]
+          .filter(Boolean)
+          .join(" | ") ||
+        appointment.note;
+      await appointment.save({ session });
+    });
+
+    if (stockUpdates.length > 0) {
+      await updateFeaturedProductsCache();
     }
-
-    const completionSummary = [
-      worksPerformed?.trim(),
-      partsUsed?.trim() ? `Piese: ${partsUsed.trim()}` : "",
-      laborHours !== undefined && laborHours !== null && laborHours !== "" ? `Ore: ${laborHours}` : "",
-    ].filter(Boolean).join(" | ");
-
-    appointment.status = "Finalizată";
-    appointment.note = notes?.trim() || completionSummary || appointment.note;
-    await appointment.save();
 
     res.json({ success: true, appointment, serviceOrder });
   } catch (error) {
     console.error("Error in completeAppointmentServiceOrder:", error.message);
-    res.status(500).json({ success: false, message: error.message });
+    res.status(error.message.includes("Stoc") ? 400 : 500).json({
+      success: false,
+      message: error.message || "Eroare la finalizarea programării",
+    });
+  } finally {
+    session.endSession();
   }
 };
 
