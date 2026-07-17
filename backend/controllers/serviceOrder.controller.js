@@ -90,7 +90,20 @@ export const createServiceOrder = async (req, res) => {
 // Listare toate fișele (admin)
 export const getAllServiceOrders = async (req, res) => {
   try {
-    const orders = await ServiceOrder.find().sort({ createdAt: -1 });
+    const { mechanicId } = req.query;
+    const filter = {};
+
+    if (mechanicId) {
+      if (!mongoose.Types.ObjectId.isValid(mechanicId)) {
+        return res.status(400).json({ success: false, message: "ID mecanic invalid" });
+      }
+      filter.mechanic = mechanicId;
+    }
+
+    const orders = await ServiceOrder.find(filter)
+      .populate("mechanic", "name")
+      .populate("user", "firstName lastName email")
+      .sort({ createdAt: -1 });
     res.json({ success: true, orders });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });

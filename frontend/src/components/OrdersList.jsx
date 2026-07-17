@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { useOrderStore } from "../stores/useOrderStore";
 import LoadingSpinner from "./LoadingSpinner";
@@ -75,13 +75,13 @@ const OrdersList = () => {
 		fetchAllOrders();
 	}, [fetchAllOrders]);
 
-	const applyOrderFilters = useCallback(async () => {
+	const applyOrderFilters = async () => {
 		const filters = {};
 		if (filterStatus) {
 			filters.status = filterStatus;
 		}
-		if (filterClientName) {
-			filters.clientName = filterClientName;
+		if (filterClientName.trim()) {
+			filters.clientName = filterClientName.trim();
 		}
 		if (filterStartDate) {
 			filters.startDate = filterStartDate;
@@ -91,18 +91,14 @@ const OrdersList = () => {
 		}
 
 		await fetchFilteredOrders(filters);
-	}, [filterStatus, filterClientName, filterStartDate, filterEndDate, fetchFilteredOrders]);
+	};
 
-	useEffect(() => {
-		applyOrderFilters();
-	}, [applyOrderFilters]);
-
-	const handleClearAllFilters = () => {
+	const handleClearAllFilters = async () => {
 		setFilterStatus('');
 		setFilterClientName('');
 		setFilterStartDate('');
 		setFilterEndDate('');
-		// applyOrderFilters will be called by the useEffect after state updates
+		await fetchAllOrders();
 	};
 
 	// Funcție locală pentru refetch sumar general

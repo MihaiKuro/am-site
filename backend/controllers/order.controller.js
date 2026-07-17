@@ -139,9 +139,52 @@ export const updateOrderToDelivered = async (req, res) => {
 
 export const getAllOrders = async (req, res) => {
     try {
-        const orders = await Order.find({})
+        const { status, clientName, startDate, endDate } = req.query;
+        const filter = {};
+
+        if (status) {
+            filter.status = status;
+        }
+
+        if (startDate || endDate) {
+            filter.createdAt = {};
+            if (startDate) {
+                filter.createdAt.$gte = new Date(startDate);
+            }
+            if (endDate) {
+                const end = new Date(endDate);
+                end.setHours(23, 59, 59, 999);
+                filter.createdAt.$lte = end;
+            }
+        }
+
+        if (clientName?.trim()) {
+            const escaped = clientName.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+            const nameRegex = new RegExp(escaped, "i");
+            const matchingUsers = await User.find({
+                $or: [
+                    { firstName: nameRegex },
+                    { lastName: nameRegex },
+                    { email: nameRegex },
+                    {
+                        $expr: {
+                            $regexMatch: {
+                                input: { $concat: ["$firstName", " ", "$lastName"] },
+                                regex: escaped,
+                                options: "i",
+                            },
+                        },
+                    },
+                ],
+            }).select("_id");
+
+            filter.user = { $in: matchingUsers.map((u) => u._id) };
+        }
+
+        const orders = await Order.find(filter)
             .populate("user", "firstName lastName email")
-            .populate("orderItems.product", "name image price");
+            .populate("orderItems.product", "name image price")
+            .sort({ createdAt: -1 });
         res.json({ orders });
     } catch (error) {
         console.error(error);

@@ -24,7 +24,7 @@ const populateProductFields = async (product) => {
 
 export const getAllProducts = async (req, res) => {
 	try {
-		const { category, subcategory, minPrice, maxPrice, minStock, maxStock, isFeatured, productId } = req.query;
+		const { category, subcategory, minPrice, maxPrice, minStock, maxStock, isFeatured } = req.query;
 		const filter = {};
 
 		if (category) {
@@ -45,9 +45,6 @@ export const getAllProducts = async (req, res) => {
 		}
 		if (isFeatured === 'true') {
 			filter.isFeatured = true;
-		}
-		if (productId) {
-			filter._id = productId;
 		}
 
 		const products = await Product.find(filter);

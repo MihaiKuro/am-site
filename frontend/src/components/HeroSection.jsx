@@ -66,7 +66,7 @@ const HeroSection = () => {
 							în service.
 						</p>
 
-						<div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
+						<div>
 							<Link
 								to="/categories"
 								className="group inline-flex items-center justify-center gap-2 rounded-lg bg-[#F5A623] px-6 py-3.5 text-sm sm:text-base font-semibold text-[#0B0F17] transition-colors hover:bg-[#FFBE4D] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#F5A623]"
@@ -77,12 +77,6 @@ const HeroSection = () => {
 									aria-hidden="true"
 								/>
 							</Link>
-							<Link
-								to="/categories"
-								className="inline-flex items-center justify-center rounded-lg border border-[#3D4F6F] bg-[#141B28]/80 px-6 py-3.5 text-sm sm:text-base font-semibold text-white transition-colors hover:border-[#2B4EE6] hover:bg-[#1A2332] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2B4EE6]"
-							>
-								Caută piese după vehicul
-							</Link>
 						</div>
 					</div>
 
@@ -92,14 +86,9 @@ const HeroSection = () => {
 							aria-hidden="true"
 						/>
 						<div className="relative rounded-2xl border border-[#2A3548] bg-[#111827]/90 p-5 sm:p-6 backdrop-blur-sm">
-							<div className="mb-5 flex items-center justify-between gap-3 border-b border-[#2A3548] pb-4">
-								<div>
-									<p className="text-[10px] uppercase tracking-[0.2em] text-[#6B7A94]">Catalog activ</p>
-									<p className="mt-1 text-sm font-medium text-white">Componente disponibile</p>
-								</div>
-								<span className="rounded-md bg-[#2B4EE6]/20 px-2.5 py-1 text-xs font-medium text-[#93AAFF]">
-									În stoc
-								</span>
+							<div className="mb-5 border-b border-[#2A3548] pb-4">
+								<p className="text-[10px] uppercase tracking-[0.2em] text-[#6B7A94]">Catalog activ</p>
+								<p className="mt-1 text-sm font-medium text-white">Componente disponibile</p>
 							</div>
 
 							<ul className="space-y-3">

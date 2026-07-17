@@ -20,7 +20,7 @@ const router = express.Router();
 router.post("/", createServiceOrder);
 
 // Toate fișele
-router.get("/", getAllServiceOrders);
+router.get("/", protectRoute, adminRoute, getAllServiceOrders);
 
 // Istoric intervenții — must be before /:id
 router.get("/history", protectRoute, getServiceHistory);

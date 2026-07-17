@@ -5,7 +5,7 @@ import { Wrench, ScanSearch, Package, UserRound } from "lucide-react";
 
 const SERVICE_TYPES = [
   { label: "Revizie generală", value: "Revizie", desc: "Schimb ulei, filtre și servicii de întreținere de rutină", duration: "1-2 ore", icon: Wrench },
-  { label: "Diagnoză și reparații", value: "Diagnoză", desc: "Diagnoză completă și servicii de reparații auto", duration: "Variază", icon: ScanSearch },
+  { label: "Diagnoză și reparații", value: "Diagnoză", desc: "Rezervi ora de început; durata finală se confirmă după diagnoză", duration: "Variază — confirmată după diagnoză", icon: ScanSearch },
   { label: "Instalare piese", value: "Altele", desc: "Instalare profesională a pieselor achiziționate", duration: "2-4 ore", icon: Package },
 ];
 

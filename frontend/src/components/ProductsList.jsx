@@ -2,12 +2,12 @@ import { motion } from "framer-motion";
 import { Trash, Star, ChevronUp, ChevronDown, Search, X, Edit, Filter } from "lucide-react";
 import { useProductStore } from "../stores/useProductStore";
 import { useCategoryStore } from "../stores/useCategoryStore";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import EditProductForm from "./EditProductForm";
 
 const ProductsList = () => {
-	const { deleteProduct, toggleFeaturedProduct, products, fetchAllProducts, fetchProductsByCategory, fetchProductsBySubcategory, fetchFilteredProducts } = useProductStore();
+	const { deleteProduct, toggleFeaturedProduct, products, fetchAllProducts, fetchFilteredProducts } = useProductStore();
 	const { categories, fetchCategories } = useCategoryStore();
 
 	const [sortConfig, setSortConfig] = useState({
@@ -27,19 +27,16 @@ const ProductsList = () => {
 	const [selectedCategory, setSelectedCategory] = useState('');
 	const [selectedSubcategory, setSelectedSubcategory] = useState('');
 	const [isFeaturedFilter, setIsFeaturedFilter] = useState(false);
-	const [productIdFilter, setProductIdFilter] = useState('');
 
 	useEffect(() => {
 		fetchCategories().catch(error => {
 			console.error('Failed to fetch categories:', error);
 		});
-	}, [fetchCategories]);
-	const applyFilters = useCallback(async () => {
-		const filters = {};
+		fetchAllProducts();
+	}, [fetchCategories, fetchAllProducts]);
 
-		if (searchQuery) {
-			filters.search = searchQuery;
-		}
+	const applyFilters = async () => {
+		const filters = {};
 
 		if (selectedCategory) {
 			filters.category = selectedCategory;
@@ -62,16 +59,9 @@ const ProductsList = () => {
 		if (isFeaturedFilter) {
 			filters.isFeatured = true;
 		}
-		if (productIdFilter) {
-			filters.productId = productIdFilter;
-		}
 
 		await fetchFilteredProducts(filters);
-	}, [searchQuery, selectedCategory, selectedSubcategory, minPrice, maxPrice, minStock, maxStock, isFeaturedFilter, productIdFilter, fetchFilteredProducts]);
-
-	useEffect(() => {
-		applyFilters();
-	}, [applyFilters]);
+	};
 
 	const filteredProducts = products.filter(product =>
 		product.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -142,7 +132,7 @@ const ProductsList = () => {
 		setSearchQuery('');
 	};
 
-	const handleClearAllFilters = () => {
+	const handleClearAllFilters = async () => {
 		setMinPrice('');
 		setMaxPrice('');
 		setMinStock('');
@@ -150,10 +140,9 @@ const ProductsList = () => {
 		setSelectedCategory('');
 		setSelectedSubcategory('');
 		setIsFeaturedFilter(false);
-		setProductIdFilter('');
 		setSearchQuery('');
 		setIsSearching(false);
-		// applyFilters is called by useEffect after state update
+		await fetchAllProducts();
 	};
 
 	const renderProductHeader = () => (
@@ -381,16 +370,6 @@ const ProductsList = () => {
 								className='h-4 w-4 text-[#2B4EE6] bg-gray-800 border-gray-600 rounded focus:ring-[#2B4EE6]'
 							/>
 							<label htmlFor='isFeaturedFilter' className='ml-2 text-sm font-medium text-gray-400'>Produse promovate</label>
-						</div>
-						<div>
-							<label htmlFor='productIdFilter' className='block text-sm font-medium text-gray-400'>ID Produs</label>
-							<input
-								type='text'
-								id='productIdFilter'
-								value={productIdFilter}
-								onChange={(e) => setProductIdFilter(e.target.value)}
-								className='mt-1 block w-full bg-gray-800/50 border border-gray-700 rounded-md py-2 px-3 text-white'
-							/>
 						</div>
 					</div>
 					<div className='flex flex-col sm:flex-row justify-end gap-3 pt-4'>
